@@ -30,6 +30,28 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Best-effort generic team email. Used by reminder sweeps and any other
+   * internal notification that just needs a subject + body. Never throws.
+   */
+  async notifyTeam(subject: string, body: string): Promise<void> {
+    if (!this.transporter || !this.teamEmail) {
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: this.teamEmail,
+        subject,
+        text: body,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to send team notification "${subject}": ${message}`);
+    }
+  }
+
   async notifyTeamOfNewLead(lead: {
     businessName: string;
     contactPerson?: string | null;

@@ -149,6 +149,7 @@ export const leads = pgTable('leads', {
   message: text('message'),
   status: leadStatusEnum('status').default('NEW').notNull(),
   clientId: uuid('client_id').references(() => clients.id),
+  lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),
   ...timestamps,
 });
 
@@ -191,6 +192,7 @@ export const approvals = pgTable('approvals', {
   feedback: text('feedback'),
   revisionCount: integer('revision_count').default(0).notNull(),
   decidedAt: timestamp('decided_at', { withTimezone: true }),
+  lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),
   ...timestamps,
 });
 
