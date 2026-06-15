@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -13,6 +13,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AssetsService } from './assets.service';
+import { AssetQueryDto } from './dto/asset-query.dto';
 import { AssetResponseDto } from './dto/asset-response.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
@@ -36,12 +37,12 @@ export class AssetsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List assets' })
+  @ApiOperation({ summary: 'List assets, optionally filtered by client, content item, type, or name search' })
   @ApiOkResponse({ description: 'Assets.', type: AssetResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list assets.' })
-  findAll(): Promise<AssetResponseDto[]> {
-    return this.assetsService.findAll();
+  findAll(@Query() query: AssetQueryDto): Promise<AssetResponseDto[]> {
+    return this.assetsService.findAll(query);
   }
 
   @Get(':id')

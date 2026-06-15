@@ -1,9 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ilike, SQL } from 'drizzle-orm';
 import { OperationError } from '../common/errors/operation-error';
+import { normalizeSearchTerm } from '../common/query.util';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { assets, clients, contentItems } from '../database/schema';
+import { AssetQueryDto } from './dto/asset-query.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 
@@ -44,8 +46,31 @@ export class AssetsService {
     }
   }
 
-  async findAll(): Promise<AssetRecord[]> {
-    return this.db.select().from(assets).orderBy(desc(assets.createdAt));
+  async findAll(filter: AssetQueryDto = {}): Promise<AssetRecord[]> {
+    const conditions: SQL[] = [];
+
+    if (filter.clientId) {
+      conditions.push(eq(assets.clientId, filter.clientId));
+    }
+
+    if (filter.contentItemId) {
+      conditions.push(eq(assets.contentItemId, filter.contentItemId));
+    }
+
+    if (filter.assetType) {
+      conditions.push(eq(assets.assetType, filter.assetType));
+    }
+
+    const search = normalizeSearchTerm(filter.q);
+    if (search) {
+      conditions.push(ilike(assets.name, search));
+    }
+
+    return this.db
+      .select()
+      .from(assets)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(assets.createdAt));
   }
 
   async findOne(id: string): Promise<AssetRecord> {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ContentService } from './content.service';
 import { ContentItemResponseDto } from './dto/content-item-response.dto';
+import { ContentQueryDto } from './dto/content-query.dto';
 import { CreateContentItemDto } from './dto/create-content-item.dto';
 import { ScheduleContentDto } from './dto/schedule-content.dto';
 import { UpdateContentItemDto } from './dto/update-content-item.dto';
@@ -37,12 +38,12 @@ export class ContentController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List content items' })
+  @ApiOperation({ summary: 'List content items, optionally filtered by client, status, type, or title search' })
   @ApiOkResponse({ description: 'Content items.', type: ContentItemResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list content.' })
-  findAll(): Promise<ContentItemResponseDto[]> {
-    return this.contentService.findAll();
+  findAll(@Query() query: ContentQueryDto): Promise<ContentItemResponseDto[]> {
+    return this.contentService.findAll(query);
   }
 
   @Get(':id')
