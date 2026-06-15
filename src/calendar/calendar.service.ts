@@ -54,6 +54,14 @@ export class CalendarService {
   }
 
   /**
+   * Whether Google Calendar credentials are configured. Lets background callers
+   * skip silently instead of throwing when no calendar is wired up.
+   */
+  isEnabled(): boolean {
+    return this.calendar !== null;
+  }
+
+  /**
    * Creates a 30-minute publishing-reminder event on the configured calendar.
    * Replaces the n8n content-scheduled flow.
    */

@@ -40,7 +40,6 @@ import { UsersModule } from './users/users.module';
         limit: 120,
       },
     ]),
-    EventEmitterModule.forRoot(),
     DatabaseModule,
     UsersModule,
     AuthModule,

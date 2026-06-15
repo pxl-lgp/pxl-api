@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
+import { ClientsService } from '../clients/clients.service';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
@@ -17,6 +18,7 @@ export class LeadsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
+    private readonly clientsService: ClientsService,
   ) {}
 
   async create(input: CreateLeadDto): Promise<LeadRecord> {
@@ -142,19 +144,10 @@ export class LeadsService {
       return { client: createdClient, updatedLead: updated };
     });
 
-    void this.automationService.logEvent({
-      eventName: 'client-created',
-      entityType: 'client',
-      entityId: client.id,
-      payload: {
-        clientId: client.id,
-        businessName: client.businessName,
-        contactPerson: client.contactPerson,
-        email: client.email,
-        status: client.status,
-        sourceLeadId: lead.id,
-      },
-    });
+    // Run the same post-create automation as a directly created client (Drive
+    // folder, onboarding notification, client-created log) so converted leads are
+    // not treated as second-class clients.
+    this.clientsService.runClientCreatedAutomation(client, { sourceLeadId: lead.id });
 
     return updatedLead;
   }

@@ -53,6 +53,19 @@ export class ClientsService {
       }, error);
     }
 
+    this.runClientCreatedAutomation(client);
+
+    return client;
+  }
+
+  /**
+   * Fires the side-effects every newly created client should get: Drive folder
+   * provisioning, a team onboarding notification, and a client-created log event.
+   * All run in the background so they never block or fail the caller. Shared by
+   * direct client creation and lead-to-client conversion so both paths behave the
+   * same way.
+   */
+  runClientCreatedAutomation(client: ClientRecord, extraPayload: Record<string, unknown> = {}): void {
     // Auto-provision a Google Drive folder if Drive is configured and no folder was supplied.
     if (!client.driveFolderUrl) {
       void this.provisionDriveFolder(client);
@@ -77,12 +90,11 @@ export class ClientsService {
         email: client.email,
         servicesNeeded: client.servicesNeeded,
         status: client.status,
+        ...extraPayload,
       },
     }).catch((error: unknown) => {
       this.logger.error(`Failed to log client-created event: ${error instanceof Error ? error.message : String(error)}`);
     });
-
-    return client;
   }
 
   async findAll(): Promise<ClientRecord[]> {

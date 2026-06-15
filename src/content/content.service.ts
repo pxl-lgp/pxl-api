@@ -1,6 +1,7 @@
-import { HttpException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
+import { CalendarService } from '../calendar/calendar.service';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
@@ -25,10 +26,13 @@ type ContentItemRecord = typeof contentItems.$inferSelect;
 
 @Injectable()
 export class ContentService {
+  private readonly logger = new Logger(ContentService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly automationService: AutomationService,
     private readonly metaPublishingService: MetaPublishingService,
+    private readonly calendarService: CalendarService,
   ) {}
 
   async create(input: CreateContentItemDto): Promise<ContentItemRecord> {
@@ -162,6 +166,11 @@ export class ContentService {
         },
       });
 
+      // Create a Google Calendar publishing reminder in the background, replacing
+      // the old n8n content-scheduled flow. Skipped silently when no calendar is
+      // configured; never blocks or fails the schedule request.
+      this.createScheduleReminder(contentItem);
+
       return contentItem;
     } catch (error) {
       throw new OperationError('Failed to schedule content item.', 'content.schedule', {
@@ -169,6 +178,46 @@ export class ContentService {
         contentItemId: id,
       }, error);
     }
+  }
+
+  private createScheduleReminder(contentItem: ContentItemRecord): void {
+    if (!this.calendarService.isEnabled()) {
+      return;
+    }
+
+    void this.calendarService
+      .createPublishReminder({
+        contentId: contentItem.id,
+        clientId: contentItem.clientId,
+        title: contentItem.title,
+        platform: contentItem.platform,
+        contentType: contentItem.contentType,
+        caption: contentItem.caption,
+        hashtags: contentItem.hashtags,
+        scheduledAt: contentItem.scheduledAt,
+      })
+      .then((result) => {
+        void this.automationService.logEvent({
+          eventName: 'content-calendar-reminder',
+          entityType: 'content',
+          entityId: contentItem.id,
+          payload: { eventId: result.eventId, htmlLink: result.htmlLink },
+        });
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Failed to create calendar reminder for content ${contentItem.id}: ${message}`,
+        );
+
+        void this.automationService.logEvent({
+          eventName: 'content-calendar-reminder',
+          entityType: 'content',
+          entityId: contentItem.id,
+          status: 'FAILED',
+          errorMessage: message,
+        });
+      });
   }
 
   async publish(id: string): Promise<ContentItemRecord> {
