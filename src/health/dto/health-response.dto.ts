@@ -18,4 +18,11 @@ export class HealthResponseDto {
     description: 'Server timestamp in ISO 8601 format.',
   })
   timestamp!: string;
+
+  @ApiProperty({
+    example: 'up',
+    description: 'Database connectivity status. Only present on the readiness check.',
+    required: false,
+  })
+  database?: string;
 }
