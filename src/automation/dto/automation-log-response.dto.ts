@@ -22,7 +22,7 @@ export class AutomationLogResponseDto {
   @ApiProperty({ example: { status: 200, body: 'ok' } })
   response!: Record<string, unknown>;
 
-  @ApiPropertyOptional({ example: 'n8n webhook responded 500: workflow error' })
+  @ApiPropertyOptional({ example: 'Google Drive API error: 403 Forbidden' })
   errorMessage!: string | null;
 
   @ApiProperty({ example: '2026-05-30T17:11:56.365Z' })

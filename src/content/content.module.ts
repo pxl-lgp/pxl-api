@@ -10,5 +10,6 @@ import { MetaPublishingService } from './meta-publishing.service';
   imports: [AutomationModule, DatabaseModule, SocialConnectionsModule],
   controllers: [ContentController],
   providers: [ContentService, MetaPublishingService],
+  exports: [ContentService],
 })
 export class ContentModule {}

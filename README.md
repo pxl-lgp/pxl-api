@@ -291,25 +291,42 @@ https://drive.google.com/drive/folders/FOLDER_ID
 
 Uploads are limited to 25 MB per request. The API verifies that every requested item is inside the client's saved root folder.
 
-If `N8N_WEBHOOK_BASE_URL` is configured, the backend sends automation events to:
+## Automation (built-in, no n8n)
 
-```text
-{N8N_WEBHOOK_BASE_URL}/{eventName}
-```
+All automation runs inside the API — no external workflow tool is required.
 
-For example:
+### Auto Drive folder provisioning
 
-```text
-{N8N_WEBHOOK_BASE_URL}/client-created
-{N8N_WEBHOOK_BASE_URL}/content-scheduled
-```
-
-You can also set exact workflow URLs for n8n test or production webhooks:
+When a client is created (via `POST /api/clients` or `POST /api/onboarding`) the API automatically creates a Google Drive folder inside `DRIVE_CLIENTS_PARENT_FOLDER_ID` and saves its URL to the client record. Set this to the Drive folder ID where all client workspaces should live:
 
 ```env
-N8N_CLIENT_CREATED_WEBHOOK_URL=https://your-n8n-host/webhook-test/client-created
-N8N_CONTENT_SCHEDULED_WEBHOOK_URL=https://your-n8n-host/webhook-test/content-scheduled
+DRIVE_CLIENTS_PARENT_FOLDER_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs
 ```
+
+If `DRIVE_CLIENTS_PARENT_FOLDER_ID` is not set, or Drive credentials are not configured, folder creation is skipped silently and the folder URL can be set manually via `PATCH /api/clients/:id`.
+
+### Scheduled content auto-publishing
+
+Content items with `status = SCHEDULED` are published automatically at their `scheduledAt` time. A cron job runs every minute and calls the same publish logic as `PATCH /api/content/:id/publish`. Per-platform results are stored in `publishResults`, so a partial failure on one target does not re-publish targets that already succeeded.
+
+### Email notifications
+
+Set SMTP credentials to send team notification emails when a new lead or onboarding comes in:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user@example.com
+SMTP_PASS=secret
+SMTP_FROM=PXL <noreply@example.com>
+TEAM_NOTIFICATION_EMAIL=team@example.com
+```
+
+All email sending is best-effort and non-blocking — a failed send is logged but never surfaces as an API error.
+
+### Automation log
+
+Every internal event (client-created, drive-folder-provisioned, lead-created, content-scheduled, content-auto-published) is written to the `automation_logs` table and visible at `GET /api/automation/logs`.
 
 ## Phase 1 Status
 

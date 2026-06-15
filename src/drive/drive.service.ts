@@ -73,20 +73,10 @@ export class DriveService {
     this.drive = google.drive({ version: 'v3', auth });
   }
 
-  /**
-   * Provisions a new client's Google Drive workspace: a root folder named after
-   * the business, the standard PXL subfolders inside it, and saves the root
-   * folder URL back onto the client record. Replaces the n8n client-created flow.
-   */
-  async provisionClientWorkspace(clientId: string, businessName: string) {
-    const drive = this.getDrive();
-    const parentFolderId =
-      this.config.get('GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID', { infer: true }) || 'root';
-    const rootFolderName = this.sanitizeFolderName(businessName) || 'PXL Client';
-
-    const rootResponse = await drive.files.create({
+  async provisionClientFolder(clientName: string, parentFolderId: string): Promise<string> {
+    const response = await this.getDrive().files.create({
       requestBody: {
-        name: rootFolderName,
+        name: clientName.trim(),
         mimeType: FOLDER_MIME_TYPE,
         parents: [parentFolderId],
       },
@@ -94,34 +84,14 @@ export class DriveService {
       supportsAllDrives: true,
     });
 
-    const rootFolderId = rootResponse.data.id;
+    const folderId = response.data.id;
+    const webViewLink = response.data.webViewLink;
 
-    if (!rootFolderId) {
-      throw new ServiceUnavailableException('Google Drive did not return a folder id.');
+    if (!folderId || !webViewLink) {
+      throw new Error('Drive did not return a folder id after creation.');
     }
 
-    for (const name of CLIENT_WORKSPACE_SUBFOLDERS) {
-      await drive.files.create({
-        requestBody: {
-          name,
-          mimeType: FOLDER_MIME_TYPE,
-          parents: [rootFolderId],
-        },
-        fields: 'id',
-        supportsAllDrives: true,
-      });
-    }
-
-    const driveFolderUrl =
-      rootResponse.data.webViewLink ?? `https://drive.google.com/drive/folders/${rootFolderId}`;
-
-    await this.clientsService.updateDriveFolder(clientId, driveFolderUrl);
-
-    return {
-      rootFolderId,
-      driveFolderUrl,
-      subfolderCount: CLIENT_WORKSPACE_SUBFOLDERS.length,
-    };
+    return webViewLink;
   }
 
   async listClientFolder(clientId: string, folderId?: string) {

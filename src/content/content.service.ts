@@ -142,7 +142,7 @@ export class ContentService {
         .where(eq(contentItems.id, id))
         .returning();
 
-      await this.automationService.emitEvent({
+      void this.automationService.logEvent({
         eventName: 'content-scheduled',
         entityType: 'content',
         entityId: contentItem.id,

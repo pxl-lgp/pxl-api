@@ -9,5 +9,6 @@ import { DriveService } from './drive.service';
   imports: [ClientsModule, ClientPortalModule],
   controllers: [DriveController, ClientDriveController],
   providers: [DriveService],
+  exports: [DriveService],
 })
 export class DriveModule {}
