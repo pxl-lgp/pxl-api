@@ -1,8 +1,10 @@
 import { HttpException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, SQL } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { OperationError } from '../common/errors/operation-error';
+import { normalizeSearchTerm } from '../common/query.util';
+import { ContentQueryDto } from './dto/content-query.dto';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import {
@@ -72,8 +74,31 @@ export class ContentService {
     }
   }
 
-  async findAll(): Promise<ContentItemRecord[]> {
-    return this.db.select().from(contentItems).orderBy(desc(contentItems.createdAt));
+  async findAll(filter: ContentQueryDto = {}): Promise<ContentItemRecord[]> {
+    const conditions: SQL[] = [];
+
+    if (filter.clientId) {
+      conditions.push(eq(contentItems.clientId, filter.clientId));
+    }
+
+    if (filter.status) {
+      conditions.push(eq(contentItems.status, filter.status));
+    }
+
+    if (filter.contentType) {
+      conditions.push(eq(contentItems.contentType, filter.contentType));
+    }
+
+    const search = normalizeSearchTerm(filter.q);
+    if (search) {
+      conditions.push(ilike(contentItems.title, search));
+    }
+
+    return this.db
+      .select()
+      .from(contentItems)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(contentItems.createdAt));
   }
 
   async findOne(id: string): Promise<ContentItemRecord> {
