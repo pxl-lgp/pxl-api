@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -151,26 +152,36 @@ export const leads = pgTable('leads', {
   ...timestamps,
 });
 
-export const contentItems = pgTable('content_items', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  clientId: uuid('client_id').references(() => clients.id).notNull(),
-  title: text('title').notNull(),
-  contentType: text('content_type').notNull(),
-  platform: text('platform'),
-  platforms: jsonb('platforms').$type<SocialPlatform[]>().default([]).notNull(),
-  socialTargets: jsonb('social_targets').$type<SocialTarget[]>().default([]).notNull(),
-  status: contentStatusEnum('status').default('IDEA').notNull(),
-  caption: text('caption'),
-  hashtags: jsonb('hashtags').$type<string[]>().default([]).notNull(),
-  mediaUrl: text('media_url'),
-  publishResults: jsonb('publish_results')
-    .$type<Record<string, SocialPublishResult>>()
-    .default({})
-    .notNull(),
-  scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
-  publishedAt: timestamp('published_at', { withTimezone: true }),
-  ...timestamps,
-});
+export const contentItems = pgTable(
+  'content_items',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id').references(() => clients.id).notNull(),
+    title: text('title').notNull(),
+    contentType: text('content_type').notNull(),
+    platform: text('platform'),
+    platforms: jsonb('platforms').$type<SocialPlatform[]>().default([]).notNull(),
+    socialTargets: jsonb('social_targets').$type<SocialTarget[]>().default([]).notNull(),
+    status: contentStatusEnum('status').default('IDEA').notNull(),
+    caption: text('caption'),
+    hashtags: jsonb('hashtags').$type<string[]>().default([]).notNull(),
+    mediaUrl: text('media_url'),
+    publishResults: jsonb('publish_results')
+      .$type<Record<string, SocialPublishResult>>()
+      .default({})
+      .notNull(),
+    // Number of failed auto-publish attempts. Used to stop the every-minute cron
+    // from retrying (and re-logging) a permanently failing item forever.
+    publishAttempts: integer('publish_attempts').default(0).notNull(),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    // Supports the scheduler's every-minute "due SCHEDULED content" scan.
+    index('content_items_status_scheduled_at_idx').on(table.status, table.scheduledAt),
+  ],
+);
 
 export const approvals = pgTable('approvals', {
   id: uuid('id').defaultRandom().primaryKey(),
