@@ -3,7 +3,9 @@
 # ---- Builder: install all deps and compile TypeScript ----
 FROM node:22.13.0-bookworm-slim AS builder
 WORKDIR /app
-RUN corepack enable
+# Update corepack first: the version bundled with Node 22.13 has stale signing
+# keys and cannot verify recent pnpm releases ("Cannot find matching keyid").
+RUN npm install -g corepack@latest && corepack enable
 # Install deps first for better layer caching.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -14,7 +16,9 @@ RUN pnpm build
 FROM node:22.13.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
-RUN corepack enable
+# Update corepack first: the version bundled with Node 22.13 has stale signing
+# keys and cannot verify recent pnpm releases ("Cannot find matching keyid").
+RUN npm install -g corepack@latest && corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod && pnpm store prune
 COPY --from=builder /app/dist ./dist
