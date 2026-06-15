@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AutomationModule } from './automation/automation.module';
 import { ApprovalsModule } from './approvals/approvals.module';
@@ -26,6 +28,13 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env.local', '.env'],
       validate: validateConfig,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     DatabaseModule,
     UsersModule,
     AuthModule,
@@ -43,6 +52,12 @@ import { UsersModule } from './users/users.module';
     ReportsModule,
     SocialConnectionsModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

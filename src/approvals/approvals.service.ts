@@ -17,25 +17,27 @@ export class ApprovalsService {
     const contentItem = await this.ensureContentItemExists(input.contentItemId);
 
     try {
-      const [approval] = await this.db
-        .insert(approvals)
-        .values({
-          contentItemId: contentItem.id,
-          clientId: contentItem.clientId,
-          status: 'PENDING',
-          revisionCount: 0,
-        })
-        .returning();
+      return await this.db.transaction(async (tx) => {
+        const [approval] = await tx
+          .insert(approvals)
+          .values({
+            contentItemId: contentItem.id,
+            clientId: contentItem.clientId,
+            status: 'PENDING',
+            revisionCount: 0,
+          })
+          .returning();
 
-      await this.db
-        .update(contentItems)
-        .set({
-          status: 'CLIENT_APPROVAL',
-          updatedAt: new Date(),
-        })
-        .where(eq(contentItems.id, contentItem.id));
+        await tx
+          .update(contentItems)
+          .set({
+            status: 'CLIENT_APPROVAL',
+            updatedAt: new Date(),
+          })
+          .where(eq(contentItems.id, contentItem.id));
 
-      return approval;
+        return approval;
+      });
     } catch (error) {
       throw new OperationError('Failed to create approval.', 'approvals.create', {
         stage: 'insert-approval',
@@ -71,27 +73,29 @@ export class ApprovalsService {
         ? existingApproval.revisionCount + 1
         : existingApproval.revisionCount;
 
-    const [approval] = await this.db
-      .update(approvals)
-      .set({
-        status: input.status,
-        feedback: input.feedback,
-        revisionCount,
-        decidedAt,
-        updatedAt: decidedAt,
-      })
-      .where(eq(approvals.id, id))
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [approval] = await tx
+        .update(approvals)
+        .set({
+          status: input.status,
+          feedback: input.feedback,
+          revisionCount,
+          decidedAt,
+          updatedAt: decidedAt,
+        })
+        .where(eq(approvals.id, id))
+        .returning();
 
-    await this.db
-      .update(contentItems)
-      .set({
-        status: input.status === 'APPROVED' ? 'APPROVED' : 'REVISION_REQUESTED',
-        updatedAt: new Date(),
-      })
-      .where(eq(contentItems.id, approval.contentItemId));
+      await tx
+        .update(contentItems)
+        .set({
+          status: input.status === 'APPROVED' ? 'APPROVED' : 'REVISION_REQUESTED',
+          updatedAt: new Date(),
+        })
+        .where(eq(contentItems.id, approval.contentItemId));
 
-    return approval;
+      return approval;
+    });
   }
 
   private async ensureContentItemExists(contentItemId: string) {

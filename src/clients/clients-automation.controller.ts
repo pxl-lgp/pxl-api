@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Param, ParseUUIDPipe, Patch, UnauthorizedException } from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
 import {
   ApiHeader,
   ApiNotFoundResponse,
@@ -44,7 +45,14 @@ export class ClientsAutomationController {
   private assertAutomationSecret(secret?: string): void {
     const expectedSecret = this.config.get('AUTOMATION_WEBHOOK_SECRET', { infer: true });
 
-    if (!expectedSecret || secret !== expectedSecret) {
+    if (!expectedSecret || !secret) {
+      throw new UnauthorizedException('Invalid automation secret.');
+    }
+
+    const provided = Buffer.from(secret);
+    const expected = Buffer.from(expectedSecret);
+
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
       throw new UnauthorizedException('Invalid automation secret.');
     }
   }

@@ -63,21 +63,27 @@ export const users = pgTable('users', {
   ...timestamps,
 });
 
-export const clients = pgTable('clients', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  businessName: text('business_name').notNull(),
-  industry: text('industry'),
-  contactPerson: text('contact_person'),
-  email: text('email'),
-  phone: text('phone'),
-  socialLinks: jsonb('social_links').$type<Record<string, string>>().default({}).notNull(),
-  goals: text('goals'),
-  brandNotes: text('brand_notes'),
-  servicesNeeded: jsonb('services_needed').$type<string[]>().default([]).notNull(),
-  status: clientStatusEnum('status').default('ONBOARDING').notNull(),
-  driveFolderUrl: text('drive_folder_url'),
-  ...timestamps,
-});
+export const clients = pgTable(
+  'clients',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessName: text('business_name').notNull(),
+    industry: text('industry'),
+    contactPerson: text('contact_person'),
+    email: text('email'),
+    phone: text('phone'),
+    socialLinks: jsonb('social_links').$type<Record<string, string>>().default({}).notNull(),
+    goals: text('goals'),
+    brandNotes: text('brand_notes'),
+    servicesNeeded: jsonb('services_needed').$type<string[]>().default([]).notNull(),
+    status: clientStatusEnum('status').default('ONBOARDING').notNull(),
+    driveFolderUrl: text('drive_folder_url'),
+    ...timestamps,
+  },
+  // Client-portal users are linked to their workspace by email, so the email
+  // must resolve to at most one client. (Postgres allows multiple NULL emails.)
+  (table) => [uniqueIndex('clients_email_unique').on(table.email)],
+);
 
 export const metaAuthorizations = pgTable(
   'meta_authorizations',

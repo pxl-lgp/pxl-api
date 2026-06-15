@@ -8,6 +8,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -29,14 +30,15 @@ export class AuthController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Register a user' })
-  @ApiCreatedResponse({ description: 'User registered.', type: AuthResponseDto })
+  @ApiCreatedResponse({ description: 'User registered.', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins can register users.' })
-  register(@Body() input: RegisterDto): Promise<AuthResponseDto> {
+  register(@Body() input: RegisterDto): Promise<UserResponseDto> {
     return this.authService.register(input);
   }
 
   @Post('login')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Log in with email and password' })
   @ApiOkResponse({ description: 'Login succeeded.', type: AuthResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid email or password.' })

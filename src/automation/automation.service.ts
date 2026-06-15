@@ -34,7 +34,14 @@ export class AutomationService {
       })
       .returning();
 
-    return this.deliverEvent(log);
+    // Deliver in the background so a slow or unreachable n8n host never blocks
+    // the user-facing request that emitted the event.
+    void this.deliverEvent(log).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown automation delivery error.';
+      this.logger.error(`Automation delivery crashed for ${log.eventName}: ${message}`);
+    });
+
+    return log;
   }
 
   async findAll(): Promise<AutomationLog[]> {
@@ -72,6 +79,7 @@ export class AutomationService {
           payload: log.payload,
           automationLogId: log.id,
         }),
+        signal: AbortSignal.timeout(15_000),
       });
       const responseBody = await response.text();
 
