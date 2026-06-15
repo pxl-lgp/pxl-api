@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -38,6 +39,7 @@ type DriveItem = {
 
 @Injectable()
 export class DriveService {
+  private readonly logger = new Logger(DriveService.name);
   private readonly drive: drive_v3.Drive | null;
 
   constructor(
@@ -74,7 +76,8 @@ export class DriveService {
   }
 
   async provisionClientFolder(clientName: string, parentFolderId: string): Promise<string> {
-    const response = await this.getDrive().files.create({
+    const drive = this.getDrive();
+    const response = await drive.files.create({
       requestBody: {
         name: clientName.trim(),
         mimeType: FOLDER_MIME_TYPE,
@@ -89,6 +92,28 @@ export class DriveService {
 
     if (!folderId || !webViewLink) {
       throw new Error('Drive did not return a folder id after creation.');
+    }
+
+    // Create the standard client workspace subfolders. This is best-effort: the
+    // root folder URL is still returned (and saved) even if a subfolder fails,
+    // so a transient Drive error never leaves the client without a workspace.
+    try {
+      for (const name of CLIENT_WORKSPACE_SUBFOLDERS) {
+        await drive.files.create({
+          requestBody: {
+            name,
+            mimeType: FOLDER_MIME_TYPE,
+            parents: [folderId],
+          },
+          fields: 'id',
+          supportsAllDrives: true,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Created root folder for "${clientName.trim()}" but failed to create all subfolders: ${message}`,
+      );
     }
 
     return webViewLink;
