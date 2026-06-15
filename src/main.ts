@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AppConfig } from './config/app.config';
@@ -20,6 +21,9 @@ async function bootstrap() {
   const allowedOrigins = parseAllowedOrigins(config.get('CORS_ORIGIN', { infer: true }));
 
   app.setGlobalPrefix('api');
+  app.use(helmet());
+  // Flush in-flight requests and close the DB pool cleanly on SIGTERM/SIGINT.
+  app.enableShutdownHooks();
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

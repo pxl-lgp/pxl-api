@@ -37,6 +37,7 @@
     "class-validator": "^0.15.1",
     "drizzle-orm": "^0.44.2",
     "googleapis": "^173.0.0",
+    "helmet": "^8.2.0",
     "nodemailer": "^9.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
