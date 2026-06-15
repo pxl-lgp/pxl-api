@@ -13,6 +13,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AiService } from './ai.service';
 import { AiGenerationDto } from './dto/ai-generation.dto';
 import { AiGenerationResponseDto } from './dto/ai-generation-response.dto';
+import { AnalyzePerformanceDto } from './dto/analyze-performance.dto';
 
 @ApiTags('ai')
 @ApiBearerAuth()
@@ -50,5 +51,12 @@ export class AiController {
   @ApiOkResponse({ type: AiGenerationResponseDto })
   generateBrief(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
     return this.aiService.generateBrief(input);
+  }
+
+  @Post('analyze-performance')
+  @ApiOperation({ summary: 'Generate AI performance insights and recommendations from analytics metrics' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  analyzePerformance(@Body() input: AnalyzePerformanceDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.analyzePerformance(input);
   }
 }
