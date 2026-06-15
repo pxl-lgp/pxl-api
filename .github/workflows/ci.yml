@@ -39,7 +39,8 @@ jobs:
         run: pnpm lint
 
       - name: Test
-        run: pnpm test -- --ci
+        # Jest auto-enables CI mode from the CI env var set by GitHub Actions.
+        run: pnpm test
 
       - name: Build
         run: pnpm build
