@@ -28,6 +28,8 @@ const configSchema = z.object({
   GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
   GOOGLE_DRIVE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_DRIVE_REFRESH_TOKEN: z.string().optional(),
+  GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID: z.string().default('root'),
+  GOOGLE_CALENDAR_ID: z.string().default('primary'),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

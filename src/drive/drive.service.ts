@@ -13,6 +13,18 @@ import { ClientsService } from '../clients/clients.service';
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
+// Standard PXL client workspace subfolders, created under the client root folder
+// when a client is onboarded. Mirrors the previous n8n provisioning workflow.
+const CLIENT_WORKSPACE_SUBFOLDERS = [
+  '01 Brand Assets',
+  '02 Monthly Content',
+  '03 Reels',
+  '04 Graphics',
+  '05 Approved',
+  '06 Published',
+  '07 Reports',
+];
+
 type DriveItem = {
   id: string;
   name: string;
@@ -29,7 +41,7 @@ export class DriveService {
   private readonly drive: drive_v3.Drive | null;
 
   constructor(
-    config: ConfigService<AppConfig, true>,
+    private readonly config: ConfigService<AppConfig, true>,
     private readonly clientsService: ClientsService,
   ) {
     const oauthClientId = config.get('GOOGLE_DRIVE_CLIENT_ID', { infer: true });
@@ -59,6 +71,57 @@ export class DriveService {
     });
 
     this.drive = google.drive({ version: 'v3', auth });
+  }
+
+  /**
+   * Provisions a new client's Google Drive workspace: a root folder named after
+   * the business, the standard PXL subfolders inside it, and saves the root
+   * folder URL back onto the client record. Replaces the n8n client-created flow.
+   */
+  async provisionClientWorkspace(clientId: string, businessName: string) {
+    const drive = this.getDrive();
+    const parentFolderId =
+      this.config.get('GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID', { infer: true }) || 'root';
+    const rootFolderName = this.sanitizeFolderName(businessName) || 'PXL Client';
+
+    const rootResponse = await drive.files.create({
+      requestBody: {
+        name: rootFolderName,
+        mimeType: FOLDER_MIME_TYPE,
+        parents: [parentFolderId],
+      },
+      fields: 'id,webViewLink',
+      supportsAllDrives: true,
+    });
+
+    const rootFolderId = rootResponse.data.id;
+
+    if (!rootFolderId) {
+      throw new ServiceUnavailableException('Google Drive did not return a folder id.');
+    }
+
+    for (const name of CLIENT_WORKSPACE_SUBFOLDERS) {
+      await drive.files.create({
+        requestBody: {
+          name,
+          mimeType: FOLDER_MIME_TYPE,
+          parents: [rootFolderId],
+        },
+        fields: 'id',
+        supportsAllDrives: true,
+      });
+    }
+
+    const driveFolderUrl =
+      rootResponse.data.webViewLink ?? `https://drive.google.com/drive/folders/${rootFolderId}`;
+
+    await this.clientsService.updateDriveFolder(clientId, driveFolderUrl);
+
+    return {
+      rootFolderId,
+      driveFolderUrl,
+      subfolderCount: CLIENT_WORKSPACE_SUBFOLDERS.length,
+    };
   }
 
   async listClientFolder(clientId: string, folderId?: string) {
@@ -286,5 +349,11 @@ export class DriveService {
 
   private escapeQueryValue(value: string) {
     return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+  }
+
+  private sanitizeFolderName(value: string) {
+    return String(value ?? '')
+      .replace(/[\\/:*?"<>|]/g, '-')
+      .trim();
   }
 }
