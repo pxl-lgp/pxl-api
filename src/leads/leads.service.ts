@@ -4,6 +4,7 @@ import { AutomationService } from '../automation/automation.service';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
+import { NotificationsService } from '../notifications/notifications.service';
 import { clients, leads } from '../database/schema';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -15,6 +16,7 @@ export class LeadsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly automationService: AutomationService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(input: CreateLeadDto): Promise<LeadRecord> {
@@ -40,28 +42,31 @@ export class LeadsService {
       }, error);
     }
 
-    try {
-      await this.automationService.emitEvent({
-        eventName: 'lead-created',
-        entityType: 'lead',
-        entityId: lead.id,
-        payload: {
-          leadId: lead.id,
-          businessName: lead.businessName,
-          contactPerson: lead.contactPerson,
-          email: lead.email,
-          phone: lead.phone,
-          source: lead.source,
-          message: lead.message,
-          status: lead.status,
-        },
-      });
-    } catch (error) {
-      throw new OperationError('Lead was created, but automation event logging failed.', 'leads.create', {
-        stage: 'log-lead-created-event',
+    // Fire notifications and logging in the background so the public endpoint stays fast.
+    void this.notificationsService.notifyTeamOfNewLead({
+      businessName: lead.businessName,
+      contactPerson: lead.contactPerson,
+      email: lead.email,
+      phone: lead.phone,
+      source: lead.source,
+      message: lead.message,
+    });
+
+    void this.automationService.logEvent({
+      eventName: 'lead-created',
+      entityType: 'lead',
+      entityId: lead.id,
+      payload: {
         leadId: lead.id,
-      }, error);
-    }
+        businessName: lead.businessName,
+        contactPerson: lead.contactPerson,
+        email: lead.email,
+        phone: lead.phone,
+        source: lead.source,
+        message: lead.message,
+        status: lead.status,
+      },
+    });
 
     return lead;
   }
@@ -137,28 +142,19 @@ export class LeadsService {
       return { client: createdClient, updatedLead: updated };
     });
 
-    try {
-      await this.automationService.emitEvent({
-        eventName: 'client-created',
-        entityType: 'client',
-        entityId: client.id,
-        payload: {
-          clientId: client.id,
-          businessName: client.businessName,
-          contactPerson: client.contactPerson,
-          email: client.email,
-          status: client.status,
-          sourceLeadId: lead.id,
-        },
-      });
-    } catch (error) {
-      throw new OperationError(
-        'Lead was converted, but automation event logging failed.',
-        'leads.convertToClient',
-        { stage: 'log-client-created-event', clientId: client.id, leadId: lead.id },
-        error,
-      );
-    }
+    void this.automationService.logEvent({
+      eventName: 'client-created',
+      entityType: 'client',
+      entityId: client.id,
+      payload: {
+        clientId: client.id,
+        businessName: client.businessName,
+        contactPerson: client.contactPerson,
+        email: client.email,
+        status: client.status,
+        sourceLeadId: lead.id,
+      },
+    });
 
     return updatedLead;
   }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AutomationModule } from './automation/automation.module';
@@ -16,8 +17,10 @@ import { DatabaseModule } from './database/database.module';
 import { DriveModule } from './drive/drive.module';
 import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { ReportsModule } from './reports/reports.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import { SocialConnectionsModule } from './social-connections/social-connections.module';
 import { UsersModule } from './users/users.module';
 
@@ -28,6 +31,7 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env.local', '.env'],
       validate: validateConfig,
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -50,7 +54,9 @@ import { UsersModule } from './users/users.module';
     LeadsModule,
     OnboardingModule,
     ReportsModule,
+    SchedulerModule,
     SocialConnectionsModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [

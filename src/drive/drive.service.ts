@@ -61,6 +61,27 @@ export class DriveService {
     this.drive = google.drive({ version: 'v3', auth });
   }
 
+  async provisionClientFolder(clientName: string, parentFolderId: string): Promise<string> {
+    const response = await this.getDrive().files.create({
+      requestBody: {
+        name: clientName.trim(),
+        mimeType: FOLDER_MIME_TYPE,
+        parents: [parentFolderId],
+      },
+      fields: 'id,webViewLink',
+      supportsAllDrives: true,
+    });
+
+    const folderId = response.data.id;
+    const webViewLink = response.data.webViewLink;
+
+    if (!folderId || !webViewLink) {
+      throw new Error('Drive did not return a folder id after creation.');
+    }
+
+    return webViewLink;
+  }
+
   async listClientFolder(clientId: string, folderId?: string) {
     const rootFolderId = await this.getClientRootFolderId(clientId);
     const currentFolderId = folderId || rootFolderId;
