@@ -13,6 +13,18 @@ import { ClientsService } from '../clients/clients.service';
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
+// Standard PXL client workspace subfolders, created under the client root folder
+// when a client is onboarded. Mirrors the previous n8n provisioning workflow.
+const CLIENT_WORKSPACE_SUBFOLDERS = [
+  '01 Brand Assets',
+  '02 Monthly Content',
+  '03 Reels',
+  '04 Graphics',
+  '05 Approved',
+  '06 Published',
+  '07 Reports',
+];
+
 type DriveItem = {
   id: string;
   name: string;
@@ -29,7 +41,7 @@ export class DriveService {
   private readonly drive: drive_v3.Drive | null;
 
   constructor(
-    config: ConfigService<AppConfig, true>,
+    private readonly config: ConfigService<AppConfig, true>,
     private readonly clientsService: ClientsService,
   ) {
     const oauthClientId = config.get('GOOGLE_DRIVE_CLIENT_ID', { infer: true });
@@ -307,5 +319,11 @@ export class DriveService {
 
   private escapeQueryValue(value: string) {
     return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+  }
+
+  private sanitizeFolderName(value: string) {
+    return String(value ?? '')
+      .replace(/[\\/:*?"<>|]/g, '-')
+      .trim();
   }
 }
