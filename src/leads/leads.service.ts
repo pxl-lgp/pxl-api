@@ -40,21 +40,28 @@ export class LeadsService {
       }, error);
     }
 
-    await this.automationService.emitEvent({
-      eventName: 'lead-created',
-      entityType: 'lead',
-      entityId: lead.id,
-      payload: {
+    try {
+      await this.automationService.emitEvent({
+        eventName: 'lead-created',
+        entityType: 'lead',
+        entityId: lead.id,
+        payload: {
+          leadId: lead.id,
+          businessName: lead.businessName,
+          contactPerson: lead.contactPerson,
+          email: lead.email,
+          phone: lead.phone,
+          source: lead.source,
+          message: lead.message,
+          status: lead.status,
+        },
+      });
+    } catch (error) {
+      throw new OperationError('Lead was created, but automation event logging failed.', 'leads.create', {
+        stage: 'log-lead-created-event',
         leadId: lead.id,
-        businessName: lead.businessName,
-        contactPerson: lead.contactPerson,
-        email: lead.email,
-        phone: lead.phone,
-        source: lead.source,
-        message: lead.message,
-        status: lead.status,
-      },
-    });
+      }, error);
+    }
 
     return lead;
   }
@@ -100,43 +107,58 @@ export class LeadsService {
       throw new BadRequestException('Lead is already linked to a client.');
     }
 
-    const [client] = await this.db
-      .insert(clients)
-      .values({
-        businessName: lead.businessName,
-        contactPerson: lead.contactPerson,
-        email: lead.email,
-        phone: lead.phone,
-        status: 'ONBOARDING',
-        goals: lead.message,
-        servicesNeeded: [],
-        socialLinks: {},
-      })
-      .returning();
+    // Create the client and mark the lead WON atomically so a partial failure
+    // can never leave an orphaned client or a lead stuck without its client link.
+    const { client, updatedLead } = await this.db.transaction(async (tx) => {
+      const [createdClient] = await tx
+        .insert(clients)
+        .values({
+          businessName: lead.businessName,
+          contactPerson: lead.contactPerson,
+          email: lead.email,
+          phone: lead.phone,
+          status: 'ONBOARDING',
+          goals: lead.message,
+          servicesNeeded: [],
+          socialLinks: {},
+        })
+        .returning();
 
-    const [updatedLead] = await this.db
-      .update(leads)
-      .set({
-        status: 'WON',
-        clientId: client.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(leads.id, id))
-      .returning();
+      const [updated] = await tx
+        .update(leads)
+        .set({
+          status: 'WON',
+          clientId: createdClient.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, id))
+        .returning();
 
-    await this.automationService.emitEvent({
-      eventName: 'client-created',
-      entityType: 'client',
-      entityId: client.id,
-      payload: {
-        clientId: client.id,
-        businessName: client.businessName,
-        contactPerson: client.contactPerson,
-        email: client.email,
-        status: client.status,
-        sourceLeadId: lead.id,
-      },
+      return { client: createdClient, updatedLead: updated };
     });
+
+    try {
+      await this.automationService.emitEvent({
+        eventName: 'client-created',
+        entityType: 'client',
+        entityId: client.id,
+        payload: {
+          clientId: client.id,
+          businessName: client.businessName,
+          contactPerson: client.contactPerson,
+          email: client.email,
+          status: client.status,
+          sourceLeadId: lead.id,
+        },
+      });
+    } catch (error) {
+      throw new OperationError(
+        'Lead was converted, but automation event logging failed.',
+        'leads.convertToClient',
+        { stage: 'log-client-created-event', clientId: client.id, leadId: lead.id },
+        error,
+      );
+    }
 
     return updatedLead;
   }

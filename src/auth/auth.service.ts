@@ -4,7 +4,7 @@ import { compare, hash } from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
-import { UsersService } from '../users/users.service';
+import { PublicUser, UsersService } from '../users/users.service';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
@@ -15,19 +15,17 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {}
 
-  async register(input: RegisterDto): Promise<AuthResponseDto> {
+  async register(input: RegisterDto): Promise<PublicUser> {
     const passwordHash = await hash(input.password, PASSWORD_SALT_ROUNDS);
-    const user = await this.usersService.create({
+
+    // Admins create accounts on behalf of others; they should not receive a
+    // session token for the new user. The new user logs in themselves.
+    return this.usersService.create({
       email: input.email,
       passwordHash,
       name: input.name,
       role: input.role,
     });
-
-    return {
-      accessToken: await this.signAccessToken(user),
-      user,
-    };
   }
 
   async login(input: LoginDto): Promise<AuthResponseDto> {

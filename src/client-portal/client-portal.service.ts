@@ -33,17 +33,25 @@ export class ClientPortalService {
       throw new ForbiddenException('Only client users can access the client portal.');
     }
 
-    const [client] = await this.db
+    const matchingClients = await this.db
       .select()
       .from(clients)
       .where(eq(clients.email, user.email.toLowerCase()))
-      .limit(1);
+      .limit(2);
 
-    if (!client) {
+    if (matchingClients.length === 0) {
       throw new NotFoundException('No client workspace is linked to this user email.');
     }
 
-    return client;
+    // Defensive guard for legacy data created before the unique email index:
+    // refuse to silently pick one of several clients sharing this email.
+    if (matchingClients.length > 1) {
+      throw new ForbiddenException(
+        'This email is linked to more than one client workspace. Contact your account manager.',
+      );
+    }
+
+    return matchingClients[0];
   }
 
   async getContentForUser(user: AuthenticatedUser) {
@@ -93,27 +101,29 @@ export class ClientPortalService {
         ? existingApproval.revisionCount + 1
         : existingApproval.revisionCount;
 
-    const [approval] = await this.db
-      .update(approvals)
-      .set({
-        status: input.status,
-        feedback: input.feedback,
-        revisionCount,
-        decidedAt,
-        updatedAt: decidedAt,
-      })
-      .where(eq(approvals.id, approvalId))
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [approval] = await tx
+        .update(approvals)
+        .set({
+          status: input.status,
+          feedback: input.feedback,
+          revisionCount,
+          decidedAt,
+          updatedAt: decidedAt,
+        })
+        .where(eq(approvals.id, approvalId))
+        .returning();
 
-    await this.db
-      .update(contentItems)
-      .set({
-        status: input.status === 'APPROVED' ? 'APPROVED' : 'REVISION_REQUESTED',
-        updatedAt: new Date(),
-      })
-      .where(eq(contentItems.id, approval.contentItemId));
+      await tx
+        .update(contentItems)
+        .set({
+          status: input.status === 'APPROVED' ? 'APPROVED' : 'REVISION_REQUESTED',
+          updatedAt: new Date(),
+        })
+        .where(eq(contentItems.id, approval.contentItemId));
 
-    return approval;
+      return approval;
+    });
   }
 
   private getContentItems(clientId: string) {

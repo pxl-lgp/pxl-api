@@ -10,6 +10,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,6 +25,7 @@ export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
   @Post()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @ApiOperation({ summary: 'Submit a public lead inquiry' })
   @ApiCreatedResponse({ description: 'Lead submitted.', type: LeadResponseDto })
   create(@Body() input: CreateLeadDto): Promise<LeadResponseDto> {

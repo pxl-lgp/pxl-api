@@ -40,14 +40,16 @@ async function bootstrap() {
     },
   });
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('PXL Automation API')
-    .setDescription('Backend API for PXL Automation operations, workflows, and AI-assisted tools.')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  if (config.get('NODE_ENV', { infer: true }) !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('PXL Automation API')
+      .setDescription('Backend API for PXL Automation operations, workflows, and AI-assisted tools.')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(port);
 }

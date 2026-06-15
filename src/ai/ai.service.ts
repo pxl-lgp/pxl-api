@@ -51,45 +51,55 @@ export class AiService {
       provider === 'openai'
         ? 'https://api.openai.com/v1/chat/completions'
         : 'https://api.groq.com/openai/v1/chat/completions';
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.7,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You draft marketing operations content. Be concise, practical, brand-safe, and do not claim final approval.',
-          },
-          {
-            role: 'user',
-            content: this.buildPrompt(task, input),
-          },
-        ],
-      }),
-    });
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.7,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You draft marketing operations content. Be concise, practical, brand-safe, and do not claim final approval.',
+            },
+            {
+              role: 'user',
+              content: this.buildPrompt(task, input),
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!response.ok) {
+        return {
+          provider,
+          model: 'fallback',
+          output: this.fallbackDraft(task, input),
+        };
+      }
+
+      const data = (await response.json()) as ChatCompletionResponse;
+      const output = data.choices?.[0]?.message?.content?.trim() || this.fallbackDraft(task, input);
+
+      return {
+        provider,
+        model,
+        output,
+      };
+    } catch {
       return {
         provider,
         model: 'fallback',
         output: this.fallbackDraft(task, input),
       };
     }
-
-    const data = (await response.json()) as ChatCompletionResponse;
-    const output = data.choices?.[0]?.message?.content?.trim() || this.fallbackDraft(task, input);
-
-    return {
-      provider,
-      model,
-      output,
-    };
   }
 
   private buildPrompt(task: AiTask, input: AiGenerationDto): string {
