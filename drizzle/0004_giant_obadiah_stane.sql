@@ -1,0 +1,2 @@
+ALTER TABLE "content_items" ADD COLUMN "publish_attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+CREATE INDEX "content_items_status_scheduled_at_idx" ON "content_items" USING btree ("status","scheduled_at");

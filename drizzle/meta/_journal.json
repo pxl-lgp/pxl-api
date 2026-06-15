@@ -29,6 +29,13 @@
       "when": 1781521694588,
       "tag": "0003_add_clients_email_unique_index",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781529239941,
+      "tag": "0004_giant_obadiah_stane",
+      "breakpoints": true
     }
   ]
 }

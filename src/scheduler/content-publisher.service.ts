@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { and, desc, eq, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
 import { Inject } from '@nestjs/common';
 import { AutomationService } from '../automation/automation.service';
 import { DRIZZLE } from '../database/database.constants';
@@ -8,7 +8,14 @@ import { Database } from '../database/database.types';
 import { approvals, contentItems } from '../database/schema';
 import { ContentService } from '../content/content.service';
 
-type DueContentItem = { id: string; title: string; clientId: string };
+type DueContentItem = { id: string; title: string; clientId: string; publishAttempts: number };
+
+// Stop retrying (and re-logging) an item after this many failed auto-publish attempts.
+const MAX_PUBLISH_ATTEMPTS = 3;
+
+// Fixed key for the Postgres advisory lock that serialises the publish sweep, so
+// running multiple API instances never double-publishes the same content.
+const PUBLISH_SWEEP_LOCK_KEY = 4815162342;
 
 @Injectable()
 export class ContentPublisherService {
@@ -22,13 +29,37 @@ export class ContentPublisherService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async publishScheduledContent(): Promise<void> {
+    // Hold a transaction-scoped advisory lock for the whole sweep so only one
+    // instance publishes at a time. The lock auto-releases when the transaction
+    // ends; the actual publish writes happen on the pool, outside this tx.
+    await this.db.transaction(async (tx) => {
+      const lockResult = await tx.execute(
+        sql`select pg_try_advisory_xact_lock(${PUBLISH_SWEEP_LOCK_KEY}::bigint) as locked`,
+      );
+      const locked = (lockResult.rows[0] as { locked?: boolean } | undefined)?.locked === true;
+
+      if (!locked) {
+        return;
+      }
+
+      await this.runPublishSweep();
+    });
+  }
+
+  private async runPublishSweep(): Promise<void> {
     const due = await this.db
-      .select({ id: contentItems.id, title: contentItems.title, clientId: contentItems.clientId })
+      .select({
+        id: contentItems.id,
+        title: contentItems.title,
+        clientId: contentItems.clientId,
+        publishAttempts: contentItems.publishAttempts,
+      })
       .from(contentItems)
       .where(
         and(
           eq(contentItems.status, 'SCHEDULED'),
           lte(contentItems.scheduledAt, new Date()),
+          lt(contentItems.publishAttempts, MAX_PUBLISH_ATTEMPTS),
         ),
       );
 
@@ -58,19 +89,42 @@ export class ContentPublisherService {
           payload: { title: item.title, clientId: item.clientId },
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Failed to auto-publish content item ${item.id}: ${message}`);
-
-        void this.automationService.logEvent({
-          eventName: 'content-auto-published',
-          entityType: 'content',
-          entityId: item.id,
-          status: 'FAILED',
-          errorMessage: message,
-          payload: { title: item.title, clientId: item.clientId },
-        });
+        await this.handlePublishFailure(item, error);
       }
     }
+  }
+
+  private async handlePublishFailure(item: DueContentItem, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    const attempts = item.publishAttempts + 1;
+    const abandoned = attempts >= MAX_PUBLISH_ATTEMPTS;
+
+    await this.db
+      .update(contentItems)
+      .set({
+        publishAttempts: sql`${contentItems.publishAttempts} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(contentItems.id, item.id));
+
+    if (abandoned) {
+      this.logger.error(
+        `Abandoning auto-publish for content ${item.id} after ${attempts} attempt(s): ${message}`,
+      );
+    } else {
+      this.logger.warn(
+        `Auto-publish attempt ${attempts}/${MAX_PUBLISH_ATTEMPTS} failed for content ${item.id}: ${message}`,
+      );
+    }
+
+    void this.automationService.logEvent({
+      eventName: abandoned ? 'content-auto-publish-abandoned' : 'content-auto-published',
+      entityType: 'content',
+      entityId: item.id,
+      status: 'FAILED',
+      errorMessage: message,
+      payload: { title: item.title, clientId: item.clientId, attempts, maxAttempts: MAX_PUBLISH_ATTEMPTS },
+    });
   }
 
   /**
