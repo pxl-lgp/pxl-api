@@ -83,18 +83,9 @@ POST /api/clients
 GET /api/clients
 GET /api/clients/:id
 PATCH /api/clients/:id
-PATCH /api/clients/:id/drive-folder
 ```
 
-Creating a client also logs a pending automation event:
-
-```text
-event_name: client-created
-entity_type: client
-status: PENDING
-```
-
-`PATCH /api/clients/:id/drive-folder` is an automation callback endpoint for n8n. It requires the `x-pxl-automation-secret` header to match `AUTOMATION_WEBHOOK_SECRET`.
+Creating a client logs a `client-created` automation event and, when Google Drive is configured, auto-provisions the client's Drive workspace folders in-process (see Automation below).
 
 Automation endpoints:
 
@@ -297,17 +288,40 @@ All automation runs inside the API — no external workflow tool is required.
 
 ### Auto Drive folder provisioning
 
-When a client is created (via `POST /api/clients` or `POST /api/onboarding`) the API automatically creates a Google Drive folder inside `DRIVE_CLIENTS_PARENT_FOLDER_ID` and saves its URL to the client record. Set this to the Drive folder ID where all client workspaces should live:
+When a client is created (via `POST /api/clients` or `POST /api/onboarding`, or when a lead is converted) the API automatically creates a Google Drive folder inside `DRIVE_CLIENTS_PARENT_FOLDER_ID` and saves its URL to the client record. The standard workspace subfolders are created inside it:
+
+```text
+Client Name/
+  01 Brand Assets/
+  02 Monthly Content/
+  03 Reels/
+  04 Graphics/
+  05 Approved/
+  06 Published/
+  07 Reports/
+```
+
+Set the parent to the Drive folder ID where all client workspaces should live:
 
 ```env
 DRIVE_CLIENTS_PARENT_FOLDER_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs
 ```
 
-If `DRIVE_CLIENTS_PARENT_FOLDER_ID` is not set, or Drive credentials are not configured, folder creation is skipped silently and the folder URL can be set manually via `PATCH /api/clients/:id`.
+If `DRIVE_CLIENTS_PARENT_FOLDER_ID` is not set, or Drive credentials are not configured, folder creation is skipped silently and the folder URL can be set manually via `PATCH /api/clients/:id`. Subfolder creation is best-effort: the root folder URL is still saved even if a subfolder fails.
 
 ### Scheduled content auto-publishing
 
 Content items with `status = SCHEDULED` are published automatically at their `scheduledAt` time. A cron job runs every minute and calls the same publish logic as `PATCH /api/content/:id/publish`. Per-platform results are stored in `publishResults`, so a partial failure on one target does not re-publish targets that already succeeded.
+
+The auto-publisher is hardened for production:
+
+- **Approval gated** — only content whose latest approval decision is `APPROVED` is auto-published. (Manual `PATCH /api/content/:id/publish` is not gated.)
+- **Retry cap** — after 3 failed attempts an item stops retrying and logs a `content-auto-publish-abandoned` event instead of re-failing every minute.
+- **Single runner** — the sweep takes a Postgres advisory lock, so running multiple API instances never double-publishes the same item.
+
+### Publishing calendar reminders
+
+When content is scheduled and Google Calendar credentials are available, the API creates a 30-minute Google Calendar publishing reminder via the same Google account used for Drive. Set `GOOGLE_CALENDAR_ID` to target a specific calendar (defaults to `primary`). Reminder creation is best-effort and never blocks scheduling.
 
 ### Email notifications
 
@@ -326,8 +340,4 @@ All email sending is best-effort and non-blocking — a failed send is logged bu
 
 ### Automation log
 
-Every internal event (client-created, drive-folder-provisioned, lead-created, content-scheduled, content-auto-published) is written to the `automation_logs` table and visible at `GET /api/automation/logs`.
-
-## Phase 1 Status
-
-The backend scaffold, config validation, health endpoint, Drizzle schema, and initial migration are in place. A live PostgreSQL database still needs to be created before `npm run db:migrate` can apply the migration.
+Every internal event (`client-created`, `drive-folder-provisioned`, `lead-created`, `content-scheduled`, `content-calendar-reminder`, `content-auto-published`, `content-auto-publish-abandoned`) is written to the `automation_logs` table and visible at `GET /api/automation/logs`.

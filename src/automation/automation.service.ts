@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { automationLogs } from '../database/schema';
@@ -32,28 +32,6 @@ export class AutomationService {
         response: input.response ?? {},
         errorMessage: input.errorMessage,
       })
-      .returning();
-
-    return log;
-  }
-
-  async updateLog(
-    id: string,
-    input: {
-      status: 'PENDING' | 'SENT' | 'SUCCEEDED' | 'FAILED';
-      response?: Record<string, unknown>;
-      errorMessage?: string;
-    },
-  ): Promise<AutomationLog> {
-    const [log] = await this.db
-      .update(automationLogs)
-      .set({
-        status: input.status,
-        response: input.response ?? {},
-        errorMessage: input.errorMessage,
-        updatedAt: new Date(),
-      })
-      .where(eq(automationLogs.id, id))
       .returning();
 
     return log;
