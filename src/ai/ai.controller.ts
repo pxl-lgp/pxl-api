@@ -1,0 +1,54 @@
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { AiService } from './ai.service';
+import { AiGenerationDto } from './dto/ai-generation.dto';
+import { AiGenerationResponseDto } from './dto/ai-generation-response.dto';
+
+@ApiTags('ai')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'TEAM')
+@Controller('ai')
+export class AiController {
+  constructor(private readonly aiService: AiService) {}
+
+  @Post('generate-caption')
+  @ApiOperation({ summary: 'Generate caption draft' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
+  @ApiForbiddenResponse({ description: 'Only admins and team members can use AI tools.' })
+  generateCaption(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateCaption(input);
+  }
+
+  @Post('generate-hashtags')
+  @ApiOperation({ summary: 'Generate hashtag suggestions' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateHashtags(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateHashtags(input);
+  }
+
+  @Post('generate-reel-script')
+  @ApiOperation({ summary: 'Generate reel script draft' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateReelScript(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateReelScript(input);
+  }
+
+  @Post('generate-brief')
+  @ApiOperation({ summary: 'Generate creative brief draft' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateBrief(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateBrief(input);
+  }
+}

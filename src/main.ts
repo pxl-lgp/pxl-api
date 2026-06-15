@@ -1,0 +1,55 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { AppConfig } from './config/app.config';
+
+function parseAllowedOrigins(originConfig: string) {
+  return originConfig
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+}
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const config = app.get(ConfigService<AppConfig, true>);
+  const port = config.get('PORT', { infer: true });
+  const allowedOrigins = parseAllowedOrigins(config.get('CORS_ORIGIN', { infer: true }));
+
+  app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalFilters(new AllExceptionsFilter(config));
+  app.enableCors({
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      callback(null, allowedOrigins.includes(normalizedOrigin));
+    },
+  });
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('PXL Automation API')
+    .setDescription('Backend API for PXL Automation operations, workflows, and AI-assisted tools.')
+    .setVersion('0.1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
+
+  await app.listen(port);
+}
+
+void bootstrap();
