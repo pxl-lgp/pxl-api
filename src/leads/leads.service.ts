@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { ClientsService } from '../clients/clients.service';
@@ -8,12 +8,15 @@ import { Database } from '../database/database.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { clients, leads } from '../database/schema';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { scoreLead } from './lead-scoring';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 
 type LeadRecord = typeof leads.$inferSelect;
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly automationService: AutomationService,
@@ -23,6 +26,13 @@ export class LeadsService {
 
   async create(input: CreateLeadDto): Promise<LeadRecord> {
     let lead: LeadRecord;
+    const source = input.source ?? 'Website lead form';
+    const { score, band, reasons } = scoreLead({
+      email: input.email,
+      phone: input.phone,
+      source,
+      message: input.message,
+    });
 
     try {
       [lead] = await this.db
@@ -32,9 +42,12 @@ export class LeadsService {
           contactPerson: input.contactPerson,
           email: input.email.toLowerCase(),
           phone: input.phone,
-          source: input.source ?? 'Website lead form',
+          source,
           message: input.message,
           status: 'NEW',
+          score,
+          scoreBand: band,
+          scoreReasons: reasons,
         })
         .returning();
     } catch (error) {
@@ -54,21 +67,29 @@ export class LeadsService {
       message: lead.message,
     });
 
-    void this.automationService.logEvent({
-      eventName: 'lead-created',
-      entityType: 'lead',
-      entityId: lead.id,
-      payload: {
-        leadId: lead.id,
-        businessName: lead.businessName,
-        contactPerson: lead.contactPerson,
-        email: lead.email,
-        phone: lead.phone,
-        source: lead.source,
-        message: lead.message,
-        status: lead.status,
-      },
-    });
+    void this.automationService
+      .logEvent({
+        eventName: 'lead-created',
+        entityType: 'lead',
+        entityId: lead.id,
+        payload: {
+          leadId: lead.id,
+          businessName: lead.businessName,
+          contactPerson: lead.contactPerson,
+          email: lead.email,
+          phone: lead.phone,
+          source: lead.source,
+          message: lead.message,
+          status: lead.status,
+          score: lead.score,
+          scoreBand: lead.scoreBand,
+        },
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Failed to log lead-created event: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
 
     return lead;
   }

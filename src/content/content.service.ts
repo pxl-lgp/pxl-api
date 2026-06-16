@@ -171,25 +171,31 @@ export class ContentService {
         .where(eq(contentItems.id, id))
         .returning();
 
-      void this.automationService.logEvent({
-        eventName: 'content-scheduled',
-        entityType: 'content',
-        entityId: contentItem.id,
-        payload: {
-          id: contentItem.id,
-          clientId: contentItem.clientId,
-          title: contentItem.title,
-          contentType: contentItem.contentType,
-          platform: contentItem.platform,
-          platforms: contentItem.platforms,
-          socialTargets: contentItem.socialTargets,
-          caption: contentItem.caption,
-          hashtags: contentItem.hashtags,
-          mediaUrl: contentItem.mediaUrl,
-          scheduledAt: contentItem.scheduledAt,
-          previousStatus: existingContentItem.status,
-        },
-      });
+      void this.automationService
+        .logEvent({
+          eventName: 'content-scheduled',
+          entityType: 'content',
+          entityId: contentItem.id,
+          payload: {
+            id: contentItem.id,
+            clientId: contentItem.clientId,
+            title: contentItem.title,
+            contentType: contentItem.contentType,
+            platform: contentItem.platform,
+            platforms: contentItem.platforms,
+            socialTargets: contentItem.socialTargets,
+            caption: contentItem.caption,
+            hashtags: contentItem.hashtags,
+            mediaUrl: contentItem.mediaUrl,
+            scheduledAt: contentItem.scheduledAt,
+            previousStatus: existingContentItem.status,
+          },
+        })
+        .catch((error: unknown) => {
+          this.logger.error(
+            `Failed to log content-scheduled event for ${contentItem.id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
 
       // Create a Google Calendar publishing reminder in the background, replacing
       // the old n8n content-scheduled flow. Skipped silently when no calendar is
@@ -203,6 +209,15 @@ export class ContentService {
         contentItemId: id,
       }, error);
     }
+  }
+
+  /**
+   * Re-runs calendar-reminder creation for a content item. Backs the automation
+   * retry endpoint so a FAILED content-calendar-reminder log can be re-attempted.
+   */
+  async retryCalendarReminder(id: string): Promise<void> {
+    const contentItem = await this.findOne(id);
+    this.createScheduleReminder(contentItem);
   }
 
   private createScheduleReminder(contentItem: ContentItemRecord): void {

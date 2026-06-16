@@ -25,6 +25,15 @@ export class LeadResponseDto {
   @ApiProperty({ enum: ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST'], example: 'NEW' })
   status!: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST';
 
+  @ApiProperty({ example: 78, description: 'Heuristic lead-qualification score (0-100).' })
+  score!: number;
+
+  @ApiProperty({ enum: ['COLD', 'WARM', 'HOT'], example: 'HOT' })
+  scoreBand!: 'COLD' | 'WARM' | 'HOT';
+
+  @ApiProperty({ type: [String], example: ['Provided a phone number (+15)'] })
+  scoreReasons!: string[];
+
   @ApiPropertyOptional({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
   clientId!: string | null;
 

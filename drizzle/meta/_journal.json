@@ -43,6 +43,13 @@
       "when": 1781538779268,
       "tag": "0005_groovy_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781569038187,
+      "tag": "0006_study_compliance_features",
+      "breakpoints": true
     }
   ]
 }

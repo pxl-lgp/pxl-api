@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, ilike, SQL } from 'drizzle-orm';
+import { AiService } from '../ai/ai.service';
 import { OperationError } from '../common/errors/operation-error';
 import { normalizeSearchTerm } from '../common/query.util';
 import { DRIZZLE } from '../database/database.constants';
@@ -13,7 +14,10 @@ type AssetRecord = typeof assets.$inferSelect;
 
 @Injectable()
 export class AssetsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly aiService: AiService,
+  ) {}
 
   async create(input: CreateAssetDto): Promise<AssetRecord> {
     await this.ensureClientExists(input.clientId);
@@ -104,6 +108,34 @@ export class AssetsService {
       .returning();
 
     return asset;
+  }
+
+  /**
+   * AI-suggests library tags for an asset and merges them with any existing tags
+   * (Workflow Study §12: AI tagging + searchable archives). Falls back to a
+   * deterministic draft when no AI provider is configured.
+   */
+  async autoTag(id: string): Promise<AssetRecord> {
+    const asset = await this.findOne(id);
+    const result = await this.aiService.generateTags({
+      clientName: asset.name,
+      contentTitle: asset.name,
+      contentType: asset.assetType,
+    });
+
+    const suggested = result.output
+      .split(',')
+      .map((tag) => tag.trim().replace(/^#/, '').toLowerCase())
+      .filter(Boolean);
+    const merged = [...new Set([...asset.tags, ...suggested])];
+
+    const [updated] = await this.db
+      .update(assets)
+      .set({ tags: merged, updatedAt: new Date() })
+      .where(eq(assets.id, id))
+      .returning();
+
+    return updated;
   }
 
   private async ensureClientExists(clientId: string) {

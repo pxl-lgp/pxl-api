@@ -32,6 +32,12 @@ export const socialConnectionStatusEnum = pgEnum('social_connection_status', [
   'EXPIRED',
   'REVOKED',
 ]);
+export const leadScoreBandEnum = pgEnum('lead_score_band', ['COLD', 'WARM', 'HOT']);
+export const onboardingTaskStatusEnum = pgEnum('onboarding_task_status', [
+  'PENDING',
+  'IN_PROGRESS',
+  'DONE',
+]);
 
 export type SocialPlatform = 'FACEBOOK_PAGE' | 'INSTAGRAM';
 
@@ -148,6 +154,11 @@ export const leads = pgTable('leads', {
   source: text('source'),
   message: text('message'),
   status: leadStatusEnum('status').default('NEW').notNull(),
+  // Heuristic lead-qualification score (0-100) and band, computed on intake so the
+  // team can triage hot leads first. See leads/lead-scoring.ts.
+  score: integer('score').default(0).notNull(),
+  scoreBand: leadScoreBandEnum('score_band').default('COLD').notNull(),
+  scoreReasons: jsonb('score_reasons').$type<string[]>().default([]).notNull(),
   clientId: uuid('client_id').references(() => clients.id),
   lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),
   ...timestamps,
@@ -232,6 +243,52 @@ export const reports = pgTable('reports', {
   periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
   summary: text('summary'),
   driveUrl: text('drive_url'),
+  ...timestamps,
+});
+
+// Standard onboarding checklist generated for every new client (Workflow Study
+// §3: "task creation"). Lets the team track onboarding to completion.
+export const onboardingTasks = pgTable(
+  'onboarding_tasks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    status: onboardingTaskStatusEnum('status').default('PENDING').notNull(),
+    sortOrder: integer('sort_order').default(0).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index('onboarding_tasks_client_idx').on(table.clientId)],
+);
+
+// Content pillars define the recurring themes a client's monthly plan is built
+// from (Workflow Study §4: "content pillars, monthly plans").
+export const contentPillars = pgTable(
+  'content_pillars',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    // Target number of posts per month for this pillar; drives monthly planning.
+    cadencePerMonth: integer('cadence_per_month').default(0).notNull(),
+    ...timestamps,
+  },
+  (table) => [index('content_pillars_client_idx').on(table.clientId)],
+);
+
+// Reusable content templates (Workflow Study §5: "template-based generation").
+// A NULL clientId means a shared, agency-wide template available to every client.
+export const contentTemplates = pgTable('content_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  contentType: text('content_type').notNull(),
+  platform: text('platform'),
+  // The reusable skeleton: hook/sections/CTA outline the team or AI fills in.
+  body: text('body').notNull(),
   ...timestamps,
 });
 

@@ -10,10 +10,14 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AssetsModule } from './assets/assets.module';
+import { AssistantModule } from './assistant/assistant.module';
+import { AutomationRetryModule } from './automation/automation-retry.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { ClientsModule } from './clients/clients.module';
 import { ClientPortalModule } from './client-portal/client-portal.module';
 import { ContentModule } from './content/content.module';
+import { ContentPillarsModule } from './content-pillars/content-pillars.module';
+import { ContentTemplatesModule } from './content-templates/content-templates.module';
 import { validateConfig } from './config/app.config';
 import { DatabaseModule } from './database/database.module';
 import { DriveModule } from './drive/drive.module';
@@ -21,6 +25,7 @@ import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { OnboardingTasksModule } from './onboarding-tasks/onboarding-tasks.module';
 import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SocialConnectionsModule } from './social-connections/social-connections.module';
@@ -47,15 +52,20 @@ import { UsersModule } from './users/users.module';
     AiModule,
     AnalyticsModule,
     AssetsModule,
+    AssistantModule,
     AutomationModule,
+    AutomationRetryModule,
     ApprovalsModule,
     CalendarModule,
     ClientsModule,
     ClientPortalModule,
     ContentModule,
+    ContentPillarsModule,
+    ContentTemplatesModule,
     DriveModule,
     LeadsModule,
     OnboardingModule,
+    OnboardingTasksModule,
     ReportsModule,
     SchedulerModule,
     SocialConnectionsModule,

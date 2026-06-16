@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+
+export type AiLanguage = 'EN' | 'TAGLISH';
 
 export class AiGenerationDto {
   @ApiProperty({ example: 'PXL Sample Restaurant' })
@@ -49,4 +51,21 @@ export class AiGenerationDto {
   @IsArray()
   @IsString({ each: true })
   hashtags?: string[];
+
+  @ApiPropertyOptional({
+    enum: ['EN', 'TAGLISH'],
+    default: 'EN',
+    description: 'Output language. TAGLISH produces a natural Tagalog-English mix for a Filipino audience.',
+  })
+  @IsOptional()
+  @IsIn(['EN', 'TAGLISH'])
+  language?: AiLanguage;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'When true, optimize captions for social SEO (keyword-rich first line, relevant keywords woven in).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  seo?: boolean;
 }

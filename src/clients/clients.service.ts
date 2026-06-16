@@ -8,6 +8,7 @@ import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { DriveService } from '../drive/drive.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OnboardingTasksService } from '../onboarding-tasks/onboarding-tasks.service';
 import { clients } from '../database/schema';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -23,6 +24,7 @@ export class ClientsService {
     private readonly config: ConfigService<AppConfig, true>,
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
+    private readonly onboardingTasksService: OnboardingTasksService,
     @Optional() private readonly driveService: DriveService | null,
   ) {}
 
@@ -70,6 +72,13 @@ export class ClientsService {
     if (!client.driveFolderUrl) {
       void this.provisionDriveFolder(client);
     }
+
+    // Seed the standard onboarding checklist (Workflow Study §3) in the background.
+    void this.onboardingTasksService.seedForClient(client.id).catch((error: unknown) => {
+      this.logger.error(
+        `Failed to seed onboarding tasks for client ${client.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
 
     // Notify the team of the new client/onboarding in the background.
     void this.notificationsService.notifyTeamOfNewOnboarding({
@@ -142,8 +151,23 @@ export class ClientsService {
     return client;
   }
 
+  /**
+   * Re-runs Drive provisioning for a client. Backs the automation retry endpoint
+   * so a FAILED drive-folder-provisioned log can be re-attempted.
+   */
+  async retryDriveProvisioning(clientId: string): Promise<void> {
+    const client = await this.findOne(clientId);
+    await this.provisionDriveFolder(client);
+  }
+
   private async provisionDriveFolder(client: ClientRecord): Promise<void> {
-    const parentFolderId = this.config.get('DRIVE_CLIENTS_PARENT_FOLDER_ID', { infer: true });
+    // Accept either env name: the legacy DRIVE_CLIENTS_PARENT_FOLDER_ID takes
+    // precedence, otherwise fall back to GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID
+    // (which defaults to 'root' = My Drive). This avoids a silent no-op when only
+    // the GOOGLE_-prefixed variable is set on the deployment.
+    const parentFolderId =
+      this.config.get('DRIVE_CLIENTS_PARENT_FOLDER_ID', { infer: true }) ??
+      this.config.get('GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID', { infer: true });
 
     if (!this.driveService || !parentFolderId) {
       return;

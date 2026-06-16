@@ -1,10 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { desc } from 'drizzle-orm';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { automationLogs } from '../database/schema';
 
 type AutomationLog = typeof automationLogs.$inferSelect;
+type AutomationStatus = AutomationLog['status'];
 
 @Injectable()
 export class AutomationService {
@@ -37,7 +38,25 @@ export class AutomationService {
     return log;
   }
 
-  async findAll(): Promise<AutomationLog[]> {
-    return this.db.select().from(automationLogs).orderBy(desc(automationLogs.createdAt));
+  async findAll(status?: AutomationStatus): Promise<AutomationLog[]> {
+    return this.db
+      .select()
+      .from(automationLogs)
+      .where(status ? eq(automationLogs.status, status) : undefined)
+      .orderBy(desc(automationLogs.createdAt));
+  }
+
+  async findOne(id: string): Promise<AutomationLog> {
+    const [log] = await this.db
+      .select()
+      .from(automationLogs)
+      .where(eq(automationLogs.id, id))
+      .limit(1);
+
+    if (!log) {
+      throw new NotFoundException('Automation log not found.');
+    }
+
+    return log;
   }
 }

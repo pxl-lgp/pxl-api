@@ -1,9 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { analytics, contentItems } from '../database/schema';
+import { BestTimeResult, computeBestTimes } from './best-time';
 import { CreateAnalyticsDto } from './dto/create-analytics.dto';
 import { UpdateAnalyticsDto } from './dto/update-analytics.dto';
 
@@ -12,6 +13,27 @@ type AnalyticsRecord = typeof analytics.$inferSelect;
 @Injectable()
 export class AnalyticsService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  /**
+   * Best-time-to-post suggestions derived from published content engagement
+   * (Workflow Study §9), optionally scoped to a single client.
+   */
+  async getBestTimes(clientId?: string): Promise<BestTimeResult> {
+    const condition = clientId
+      ? and(isNotNull(contentItems.publishedAt), eq(contentItems.clientId, clientId))
+      : isNotNull(contentItems.publishedAt);
+
+    const rows = await this.db
+      .select({
+        publishedAt: contentItems.publishedAt,
+        engagement: analytics.engagement,
+      })
+      .from(analytics)
+      .innerJoin(contentItems, eq(analytics.contentItemId, contentItems.id))
+      .where(condition);
+
+    return computeBestTimes(rows);
+  }
 
   async create(input: CreateAnalyticsDto): Promise<AnalyticsRecord> {
     await this.ensureContentItemExists(input.contentItemId);

@@ -1,12 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { approvals, leads } from '../database/schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { shouldRemind } from './reminders';
+
+// Fixed key for the Postgres advisory lock that serialises the reminder sweep so
+// multiple API instances never send duplicate reminder emails.
+const REMINDER_SWEEP_LOCK_KEY = 4815162343;
 
 @Injectable()
 export class RemindersService {
@@ -20,9 +24,22 @@ export class RemindersService {
 
   @Cron(CronExpression.EVERY_HOUR)
   async sweep(): Promise<void> {
-    const now = new Date();
-    await this.remindPendingApprovals(now);
-    await this.remindStaleLeads(now);
+    // Hold a transaction-scoped advisory lock for the whole sweep so only one
+    // instance reminds at a time. The lock auto-releases when the tx ends.
+    await this.db.transaction(async (tx) => {
+      const lockResult = await tx.execute(
+        sql`select pg_try_advisory_xact_lock(${REMINDER_SWEEP_LOCK_KEY}::bigint) as locked`,
+      );
+      const locked = (lockResult.rows[0] as { locked?: boolean } | undefined)?.locked === true;
+
+      if (!locked) {
+        return;
+      }
+
+      const now = new Date();
+      await this.remindPendingApprovals(now);
+      await this.remindStaleLeads(now);
+    });
   }
 
   private async remindPendingApprovals(now: Date): Promise<void> {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -6,9 +6,11 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { BestTimeResult } from './best-time';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -42,6 +44,16 @@ export class AnalyticsController {
   @ApiForbiddenResponse({ description: 'Only admins and team members can list analytics records.' })
   findAll(): Promise<AnalyticsResponseDto[]> {
     return this.analyticsService.findAll();
+  }
+
+  @Get('best-times')
+  @ApiOperation({ summary: 'Best-time-to-post suggestions from published engagement history' })
+  @ApiQuery({ name: 'clientId', required: false })
+  @ApiOkResponse({ description: 'Best-time suggestions.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
+  @ApiForbiddenResponse({ description: 'Only admins and team members can view best-time insights.' })
+  getBestTimes(@Query('clientId') clientId?: string): Promise<BestTimeResult> {
+    return this.analyticsService.getBestTimes(clientId);
   }
 
   @Get('content/:contentItemId')
