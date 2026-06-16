@@ -1,12 +1,17 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { compare, hash } from 'bcryptjs';
+import { compare, hash, hashSync } from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { PublicUser, UsersService } from '../users/users.service';
 
 const PASSWORD_SALT_ROUNDS = 12;
+
+// A precomputed hash compared against when the email is unknown, so login takes
+// the same time whether or not the account exists (defeats timing-based user
+// enumeration). The placeholder password is never a valid credential.
+const DUMMY_PASSWORD_HASH = hashSync('pxl-nonexistent-account-placeholder', PASSWORD_SALT_ROUNDS);
 
 @Injectable()
 export class AuthService {
@@ -30,14 +35,11 @@ export class AuthService {
 
   async login(input: LoginDto): Promise<AuthResponseDto> {
     const user = await this.usersService.findByEmail(input.email);
+    // Always run a bcrypt comparison (against a dummy hash when the email is
+    // unknown) so response time does not reveal whether the account exists.
+    const passwordMatches = await compare(input.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password.');
-    }
-
-    const passwordMatches = await compare(input.password, user.passwordHash);
-
-    if (!passwordMatches) {
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
