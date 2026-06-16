@@ -1,13 +1,16 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { approvals, contentItems } from '../database/schema';
+import { approvalComments, approvals, contentItems } from '../database/schema';
+import { CreateApprovalCommentDto } from './dto/create-approval-comment.dto';
 import { CreateApprovalDto } from './dto/create-approval.dto';
 import { UpdateApprovalDto } from './dto/update-approval.dto';
 
 type ApprovalRecord = typeof approvals.$inferSelect;
+type ApprovalCommentRecord = typeof approvalComments.$inferSelect;
 
 @Injectable()
 export class ApprovalsService {
@@ -96,6 +99,83 @@ export class ApprovalsService {
 
       return approval;
     });
+  }
+
+  async findComments(approvalId: string): Promise<ApprovalCommentRecord[]> {
+    await this.findOne(approvalId);
+
+    return this.db
+      .select()
+      .from(approvalComments)
+      .where(eq(approvalComments.approvalId, approvalId))
+      .orderBy(asc(approvalComments.createdAt));
+  }
+
+  async createComment(
+    approvalId: string,
+    user: AuthenticatedUser,
+    input: CreateApprovalCommentDto,
+  ): Promise<ApprovalCommentRecord> {
+    const approval = await this.findOne(approvalId);
+    const [comment] = await this.db
+      .insert(approvalComments)
+      .values({
+        approvalId,
+        clientId: approval.clientId,
+        authorUserId: user.id,
+        authorName: user.name,
+        authorRole: user.role,
+        body: input.body.trim(),
+      })
+      .returning();
+
+    return comment;
+  }
+
+  async findClientComments(clientId: string, approvalId: string): Promise<ApprovalCommentRecord[]> {
+    await this.ensureApprovalForClient(approvalId, clientId);
+
+    return this.db
+      .select()
+      .from(approvalComments)
+      .where(and(eq(approvalComments.approvalId, approvalId), eq(approvalComments.clientId, clientId)))
+      .orderBy(asc(approvalComments.createdAt));
+  }
+
+  async createClientComment(
+    clientId: string,
+    approvalId: string,
+    user: AuthenticatedUser,
+    input: CreateApprovalCommentDto,
+  ): Promise<ApprovalCommentRecord> {
+    await this.ensureApprovalForClient(approvalId, clientId);
+    const [comment] = await this.db
+      .insert(approvalComments)
+      .values({
+        approvalId,
+        clientId,
+        authorUserId: user.id,
+        authorName: user.name,
+        authorRole: user.role,
+        body: input.body.trim(),
+      })
+      .returning();
+
+    return comment;
+  }
+
+  private async ensureApprovalForClient(approvalId: string, clientId: string): Promise<ApprovalRecord> {
+    const [approval] = await this.db
+      .select()
+      .from(approvals)
+      .where(and(eq(approvals.id, approvalId), eq(approvals.clientId, clientId)))
+      .limit(1);
+
+    if (!approval) {
+      throw new NotFoundException('Approval not found for this client.');
+    }
+
+    return approval;
   }
 
   private async ensureContentItemExists(contentItemId: string) {

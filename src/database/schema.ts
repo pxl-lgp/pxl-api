@@ -38,6 +38,7 @@ export const onboardingTaskStatusEnum = pgEnum('onboarding_task_status', [
   'IN_PROGRESS',
   'DONE',
 ]);
+export const campaignStatusEnum = pgEnum('campaign_status', ['PLANNED', 'ACTIVE', 'PAUSED', 'COMPLETED']);
 
 export type SocialPlatform = 'FACEBOOK_PAGE' | 'INSTAGRAM';
 
@@ -164,11 +165,31 @@ export const leads = pgTable('leads', {
   ...timestamps,
 });
 
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    name: text('name').notNull(),
+    status: campaignStatusEnum('status').default('PLANNED').notNull(),
+    goal: text('goal'),
+    budget: text('budget'),
+    audience: text('audience'),
+    offer: text('offer'),
+    notes: text('notes'),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index('campaigns_client_idx').on(table.clientId)],
+);
+
 export const contentItems = pgTable(
   'content_items',
   {
     id: uuid('id').defaultRandom().primaryKey(),
     clientId: uuid('client_id').references(() => clients.id).notNull(),
+    campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     contentType: text('content_type').notNull(),
     platform: text('platform'),
@@ -192,6 +213,7 @@ export const contentItems = pgTable(
   (table) => [
     // Supports the scheduler's every-minute "due SCHEDULED content" scan.
     index('content_items_status_scheduled_at_idx').on(table.status, table.scheduledAt),
+    index('content_items_campaign_idx').on(table.campaignId),
   ],
 );
 
@@ -206,6 +228,21 @@ export const approvals = pgTable('approvals', {
   lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),
   ...timestamps,
 });
+
+export const approvalComments = pgTable(
+  'approval_comments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    approvalId: uuid('approval_id').references(() => approvals.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+    authorName: text('author_name').notNull(),
+    authorRole: userRoleEnum('author_role').notNull(),
+    body: text('body').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('approval_comments_approval_idx').on(table.approvalId)],
+);
 
 export const assets = pgTable('assets', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -13,6 +13,7 @@ import { AssetsModule } from './assets/assets.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { AutomationRetryModule } from './automation/automation-retry.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 import { ClientsModule } from './clients/clients.module';
 import { ClientPortalModule } from './client-portal/client-portal.module';
 import { ContentModule } from './content/content.module';
@@ -57,6 +58,7 @@ import { UsersModule } from './users/users.module';
     AutomationRetryModule,
     ApprovalsModule,
     CalendarModule,
+    CampaignsModule,
     ClientsModule,
     ClientPortalModule,
     ContentModule,

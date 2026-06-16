@@ -10,6 +10,7 @@ import { Database } from '../database/database.types';
 import {
   clients,
   contentItems,
+  campaigns,
   socialConnections,
   SocialPublishResult,
   SocialTarget,
@@ -39,6 +40,7 @@ export class ContentService {
 
   async create(input: CreateContentItemDto): Promise<ContentItemRecord> {
     await this.ensureClientExists(input.clientId);
+    await this.ensureCampaignBelongsToClient(input.campaignId, input.clientId);
     const socialTargets = this.normalizeSocialTargets(input.socialTargets);
     await this.ensureTargetsBelongToClient(input.clientId, socialTargets);
     const platforms = socialTargets.length
@@ -50,6 +52,7 @@ export class ContentService {
         .insert(contentItems)
         .values({
           clientId: input.clientId,
+          campaignId: input.campaignId,
           title: input.title,
           contentType: input.contentType,
           platform: input.platform ?? formatLegacyPlatform(platforms),
@@ -79,6 +82,10 @@ export class ContentService {
 
     if (filter.clientId) {
       conditions.push(eq(contentItems.clientId, filter.clientId));
+    }
+
+    if (filter.campaignId) {
+      conditions.push(eq(contentItems.campaignId, filter.campaignId));
     }
 
     if (filter.status) {
@@ -122,6 +129,8 @@ export class ContentService {
     if (input.clientId) {
       await this.ensureClientExists(input.clientId);
     }
+
+    await this.ensureCampaignBelongsToClient(input.campaignId, clientId);
 
     const socialTargets =
       input.socialTargets !== undefined
@@ -474,6 +483,22 @@ export class ContentService {
 
     if (!client) {
       throw new NotFoundException('Client not found.');
+    }
+  }
+
+  private async ensureCampaignBelongsToClient(campaignId: string | undefined, clientId: string): Promise<void> {
+    if (!campaignId) {
+      return;
+    }
+
+    const [campaign] = await this.db
+      .select({ id: campaigns.id })
+      .from(campaigns)
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.clientId, clientId)))
+      .limit(1);
+
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found for this client.');
     }
   }
 }

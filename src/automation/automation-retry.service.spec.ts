@@ -7,13 +7,15 @@ import { ContentService } from '../content/content.service';
 describe('AutomationRetryService.retry', () => {
   const build = (log: Record<string, unknown>) => {
     const automationService = { findOne: jest.fn().mockResolvedValue(log) } as unknown as AutomationService;
-    const clientsService = { retryDriveProvisioning: jest.fn().mockResolvedValue(undefined) } as unknown as ClientsService;
-    const contentService = { retryCalendarReminder: jest.fn().mockResolvedValue(undefined) } as unknown as ContentService;
+    const retryDriveProvisioning = jest.fn().mockResolvedValue(undefined);
+    const retryCalendarReminder = jest.fn().mockResolvedValue(undefined);
+    const clientsService = { retryDriveProvisioning } as unknown as ClientsService;
+    const contentService = { retryCalendarReminder } as unknown as ContentService;
 
     return {
       service: new AutomationRetryService(automationService, clientsService, contentService),
-      clientsService,
-      contentService,
+      retryDriveProvisioning,
+      retryCalendarReminder,
     };
   };
 
@@ -30,7 +32,7 @@ describe('AutomationRetryService.retry', () => {
   });
 
   it('re-runs drive provisioning for a failed drive-folder-provisioned log', async () => {
-    const { service, clientsService } = build({
+    const { service, retryDriveProvisioning } = build({
       status: 'FAILED',
       eventName: 'drive-folder-provisioned',
       entityId: 'client-1',
@@ -38,12 +40,12 @@ describe('AutomationRetryService.retry', () => {
 
     const result = await service.retry('log-1');
 
-    expect(clientsService.retryDriveProvisioning).toHaveBeenCalledWith('client-1');
+    expect(retryDriveProvisioning).toHaveBeenCalledWith('client-1');
     expect(result).toEqual({ retried: true, eventName: 'drive-folder-provisioned', entityId: 'client-1' });
   });
 
   it('re-runs the calendar reminder for a failed content-calendar-reminder log', async () => {
-    const { service, contentService } = build({
+    const { service, retryCalendarReminder } = build({
       status: 'FAILED',
       eventName: 'content-calendar-reminder',
       entityId: 'content-1',
@@ -51,7 +53,7 @@ describe('AutomationRetryService.retry', () => {
 
     await service.retry('log-1');
 
-    expect(contentService.retryCalendarReminder).toHaveBeenCalledWith('content-1');
+    expect(retryCalendarReminder).toHaveBeenCalledWith('content-1');
   });
 
   it('rejects an event type that cannot be retried', async () => {

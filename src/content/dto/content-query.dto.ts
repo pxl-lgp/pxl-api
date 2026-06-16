@@ -8,6 +8,11 @@ export class ContentQueryDto {
   @IsUUID()
   clientId?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by campaign.' })
+  @IsOptional()
+  @IsUUID()
+  campaignId?: string;
+
   @ApiPropertyOptional({ enum: contentStatuses, description: 'Filter by content status.' })
   @IsOptional()
   @IsEnum(contentStatuses)

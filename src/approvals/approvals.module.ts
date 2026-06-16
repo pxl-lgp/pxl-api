@@ -7,5 +7,6 @@ import { ApprovalsService } from './approvals.service';
   imports: [DatabaseModule],
   controllers: [ApprovalsController],
   providers: [ApprovalsService],
+  exports: [ApprovalsService],
 })
 export class ApprovalsModule {}

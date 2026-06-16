@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { UpdateApprovalDto } from '../approvals/dto/update-approval.dto';
+import { ApprovalsService } from '../approvals/approvals.service';
+import { CreateApprovalCommentDto } from '../approvals/dto/create-approval-comment.dto';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { approvals, assets, clients, contentItems, reports } from '../database/schema';
@@ -8,7 +10,10 @@ import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 
 @Injectable()
 export class ClientPortalService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly approvalsService: ApprovalsService,
+  ) {}
 
   async getOverview(user: AuthenticatedUser) {
     const client = await this.getClientForUser(user);
@@ -124,6 +129,18 @@ export class ClientPortalService {
 
       return approval;
     });
+  }
+
+  async getApprovalComments(user: AuthenticatedUser, approvalId: string) {
+    const client = await this.getClientForUser(user);
+
+    return this.approvalsService.findClientComments(client.id, approvalId);
+  }
+
+  async createApprovalComment(user: AuthenticatedUser, approvalId: string, input: CreateApprovalCommentDto) {
+    const client = await this.getClientForUser(user);
+
+    return this.approvalsService.createClientComment(client.id, approvalId, user, input);
   }
 
   private getContentItems(clientId: string) {

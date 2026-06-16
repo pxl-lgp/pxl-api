@@ -34,6 +34,11 @@ export class CreateContentItemDto {
   @IsUUID()
   clientId!: string;
 
+  @ApiPropertyOptional({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
+  @IsOptional()
+  @IsUUID()
+  campaignId?: string;
+
   @ApiProperty({ example: 'June promo reel' })
   @IsString()
   @MinLength(2)

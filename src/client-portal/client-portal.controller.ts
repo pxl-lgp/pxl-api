@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -9,7 +9,9 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { UpdateApprovalDto } from '../approvals/dto/update-approval.dto';
+import { ApprovalCommentResponseDto } from '../approvals/dto/approval-comment-response.dto';
 import { ApprovalResponseDto } from '../approvals/dto/approval-response.dto';
+import { CreateApprovalCommentDto } from '../approvals/dto/create-approval-comment.dto';
 import { AssetResponseDto } from '../assets/dto/asset-response.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -70,6 +72,27 @@ export class ClientPortalController {
     @Body() input: UpdateApprovalDto,
   ) {
     return this.clientPortalService.decideApproval(user, id, input);
+  }
+
+  @Get('approvals/:id/comments')
+  @ApiOperation({ summary: 'List comments for a client-visible approval' })
+  @ApiOkResponse({ description: 'Approval comments.', type: ApprovalCommentResponseDto, isArray: true })
+  getApprovalComments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.clientPortalService.getApprovalComments(user, id);
+  }
+
+  @Post('approvals/:id/comments')
+  @ApiOperation({ summary: 'Add a client comment to an approval' })
+  @ApiOkResponse({ description: 'Approval comment created.', type: ApprovalCommentResponseDto })
+  createApprovalComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: CreateApprovalCommentDto,
+  ) {
+    return this.clientPortalService.createApprovalComment(user, id, input);
   }
 
   @Get('assets')
