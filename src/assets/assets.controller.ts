@@ -67,4 +67,14 @@ export class AssetsController {
   ): Promise<AssetResponseDto> {
     return this.assetsService.update(id, input);
   }
+
+  @Post(':id/auto-tag')
+  @ApiOperation({ summary: 'AI-suggest and merge library tags for an asset' })
+  @ApiOkResponse({ description: 'Asset tags updated.', type: AssetResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
+  @ApiForbiddenResponse({ description: 'Only admins and team members can tag assets.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
+  autoTag(@Param('id', ParseUUIDPipe) id: string): Promise<AssetResponseDto> {
+    return this.assetsService.autoTag(id);
+  }
 }

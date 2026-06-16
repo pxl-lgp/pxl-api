@@ -53,6 +53,34 @@ export class AiController {
     return this.aiService.generateBrief(input);
   }
 
+  @Post('generate-broll')
+  @ApiOperation({ summary: 'Generate B-roll / supporting shot suggestions for a reel' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateBroll(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateBroll(input);
+  }
+
+  @Post('generate-overlay')
+  @ApiOperation({ summary: 'Generate on-screen overlay / caption text per scene' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateOverlay(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateOverlay(input);
+  }
+
+  @Post('generate-tags')
+  @ApiOperation({ summary: 'Generate asset-library tag suggestions' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateTags(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateTags(input);
+  }
+
+  @Post('generate-template')
+  @ApiOperation({ summary: 'Generate a reusable content template' })
+  @ApiOkResponse({ type: AiGenerationResponseDto })
+  generateTemplate(@Body() input: AiGenerationDto): Promise<AiGenerationResponseDto> {
+    return this.aiService.generateTemplate(input);
+  }
+
   @Post('analyze-performance')
   @ApiOperation({ summary: 'Generate AI performance insights and recommendations from analytics metrics' })
   @ApiOkResponse({ type: AiGenerationResponseDto })

@@ -118,7 +118,7 @@ export class ContentPublisherService {
     }
 
     void this.automationService.logEvent({
-      eventName: abandoned ? 'content-auto-publish-abandoned' : 'content-auto-published',
+      eventName: abandoned ? 'content-auto-publish-abandoned' : 'content-auto-publish-failed',
       entityType: 'content',
       entityId: item.id,
       status: 'FAILED',
