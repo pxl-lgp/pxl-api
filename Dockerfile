@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Builder: install all deps and compile TypeScript ----
-FROM node:22.22.3-trixie-slim AS builder
+FROM node:22.22.3-alpine3.24 AS builder
 WORKDIR /app
 # Update corepack first: the version bundled with Node 22.13 has stale signing
 # keys and cannot verify recent pnpm releases ("Cannot find matching keyid").
@@ -13,7 +13,7 @@ COPY . .
 RUN pnpm build
 
 # ---- Runtime: production deps + compiled output only ----
-FROM node:22.22.3-trixie-slim AS runtime
+FROM node:22.22.3-alpine3.24 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 # Update corepack first: the version bundled with Node 22.13 has stale signing
