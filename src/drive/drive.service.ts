@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
   Injectable,
   Logger,
   NotFoundException,
@@ -44,6 +46,7 @@ export class DriveService {
 
   constructor(
     private readonly config: ConfigService<AppConfig, true>,
+    @Inject(forwardRef(() => ClientsService))
     private readonly clientsService: ClientsService,
   ) {
     const oauthClientId = config.get('GOOGLE_DRIVE_CLIENT_ID', { infer: true });

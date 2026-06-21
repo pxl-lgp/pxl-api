@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
@@ -25,7 +25,9 @@ export class ClientsService {
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingTasksService: OnboardingTasksService,
-    @Optional() private readonly driveService: DriveService | null,
+    @Inject(forwardRef(() => DriveService))
+    @Optional()
+    private readonly driveService: DriveService | null,
   ) {}
 
   async create(input: CreateClientDto): Promise<ClientRecord> {
