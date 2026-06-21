@@ -44,7 +44,7 @@ async function bootstrap() {
     },
   });
 
-  if (config.get('NODE_ENV', { infer: true }) !== 'production') {
+  if (config.get('NODE_ENV', { infer: true }) !== 'production' || config.get('ENABLE_SWAGGER', { infer: true })) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('PXL Automation API')
       .setDescription('Backend API for PXL Automation operations, workflows, and AI-assisted tools.')
