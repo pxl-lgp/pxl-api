@@ -1,0 +1,2 @@
+-- Intentionally empty. This migration duplicated 0007_campaign_management.sql
+-- and 0008_approval_comments.sql, which already create these objects.
