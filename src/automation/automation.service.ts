@@ -46,6 +46,23 @@ export class AutomationService {
       .orderBy(desc(automationLogs.createdAt));
   }
 
+  async getSummary() {
+    const logs = await this.findAll();
+    const failed = logs.filter((log) => log.status === 'FAILED');
+    const pending = logs.filter((log) => log.status === 'PENDING');
+    const succeeded = logs.filter((log) => log.status === 'SUCCEEDED');
+    const lastFailure = failed[0];
+
+    return {
+      total: logs.length,
+      failed: failed.length,
+      pending: pending.length,
+      succeeded: succeeded.length,
+      lastFailureAt: lastFailure?.createdAt ?? null,
+      retryableFailures: failed.filter((log) => ['drive-folder-provisioned'].includes(log.eventName)).length,
+    };
+  }
+
   async findOne(id: string): Promise<AutomationLog> {
     const [log] = await this.db
       .select()

@@ -22,6 +22,12 @@ export class ReportResponseDto {
   @ApiPropertyOptional({ example: 'https://drive.google.com/report' })
   driveUrl!: string | null;
 
+  @ApiProperty({ enum: ['DRAFT', 'READY', 'SENT'], example: 'READY' })
+  status!: string;
+
+  @ApiPropertyOptional({ example: '2026-06-30T10:00:00.000Z' })
+  sentAt!: Date | null;
+
   @ApiProperty({ example: '2026-06-01T10:00:00.000Z' })
   createdAt!: Date;
 

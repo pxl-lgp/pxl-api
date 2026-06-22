@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 import { desc, eq } from 'drizzle-orm';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
@@ -11,7 +12,10 @@ type ReportRecord = typeof reports.$inferSelect;
 
 @Injectable()
 export class ReportsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async create(input: CreateReportDto): Promise<ReportRecord> {
     await this.ensureClientExists(input.clientId);
@@ -26,6 +30,7 @@ export class ReportsService {
           periodEnd: input.periodEnd,
           summary: input.summary,
           driveUrl: input.driveUrl,
+          status: input.status ?? 'DRAFT',
         })
         .returning();
 
@@ -70,6 +75,30 @@ export class ReportsService {
       .returning();
 
     return report;
+  }
+
+  async markReady(id: string): Promise<ReportRecord> {
+    return this.update(id, { status: 'READY' });
+  }
+
+  async send(id: string): Promise<ReportRecord> {
+    const report = await this.findOne(id);
+    const [client] = await this.db.select().from(clients).where(eq(clients.id, report.clientId)).limit(1);
+    const [updated] = await this.db
+      .update(reports)
+      .set({ status: 'SENT', sentAt: new Date(), updatedAt: new Date() })
+      .where(eq(reports.id, id))
+      .returning();
+
+    if (client?.email) {
+      await this.notificationsService.notifyUser(
+        client.email,
+        `New report: ${report.title}`,
+        `Your latest PXL report is ready.${report.driveUrl ? `\n\nOpen it here: ${report.driveUrl}` : ''}`,
+      );
+    }
+
+    return updated;
   }
 
   private async ensureClientExists(clientId: string) {

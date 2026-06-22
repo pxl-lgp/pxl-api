@@ -9,6 +9,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 const PASSWORD_SALT_ROUNDS = 12;
 
 export type UserRole = 'ADMIN' | 'TEAM' | 'CLIENT';
+export type UserStatus = 'ACTIVE' | 'DISABLED';
 
 export type UserRecord = typeof users.$inferSelect;
 
@@ -23,6 +24,7 @@ export class UsersService {
     passwordHash: string;
     name: string;
     role?: UserRole;
+    status?: UserStatus;
   }): Promise<PublicUser> {
     const existingUser = await this.findByEmail(input.email);
 
@@ -37,6 +39,7 @@ export class UsersService {
         passwordHash: input.passwordHash,
         name: input.name,
         role: input.role ?? 'TEAM',
+        status: input.status ?? 'ACTIVE',
       })
       .returning();
 
@@ -89,6 +92,7 @@ export class UsersService {
         email,
         name: input.name?.trim(),
         role: input.role,
+        status: input.status,
         passwordHash,
         updatedAt: new Date(),
       })
@@ -119,6 +123,7 @@ export class UsersService {
       email: user.email,
       name: user.name,
       role: user.role,
+      status: user.status,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

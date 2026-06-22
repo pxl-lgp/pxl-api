@@ -33,4 +33,11 @@ export class AutomationController {
   ): Promise<AutomationLogResponseDto[]> {
     return this.automationService.findAll(status);
   }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get automation health summary' })
+  @ApiOkResponse({ description: 'Automation summary.' })
+  getSummary() {
+    return this.automationService.getSummary();
+  }
 }

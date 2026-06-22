@@ -20,7 +20,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:debug": "tsx scripts/migrate-debug.ts",
     "db:studio": "drizzle-kit studio",
-    "seed:admin": "tsx scripts/seed-admin.ts"
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "admin:reset-password": "tsx scripts/reset-admin-password.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.27",

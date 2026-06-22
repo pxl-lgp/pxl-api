@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsDate, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+
+const reportStatuses = ['DRAFT', 'READY', 'SENT'] as const;
 
 export class CreateReportDto {
   @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
@@ -31,4 +33,9 @@ export class CreateReportDto {
   @IsOptional()
   @IsString()
   driveUrl?: string;
+
+  @ApiPropertyOptional({ enum: reportStatuses, example: 'DRAFT' })
+  @IsOptional()
+  @IsEnum(reportStatuses)
+  status?: (typeof reportStatuses)[number];
 }

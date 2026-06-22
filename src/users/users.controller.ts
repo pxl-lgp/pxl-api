@@ -8,6 +8,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,7 +24,10 @@ import { UsersService } from './users.service';
 @Roles('ADMIN')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List users' })
@@ -49,7 +53,21 @@ export class UsersController {
       throw new BadRequestException('You cannot remove your own admin access.');
     }
 
-    return this.usersService.update(id, input);
+    if (id === currentUser.id && input.status === 'DISABLED') {
+      throw new BadRequestException('You cannot disable your own account.');
+    }
+
+    return this.usersService.update(id, input).then(async (user) => {
+      await this.auditService.log({
+        actorUserId: currentUser.id,
+        action: 'user.updated',
+        entityType: 'user',
+        entityId: id,
+        metadata: { fields: Object.keys(input) },
+      });
+
+      return user;
+    });
   }
 
   @Delete(':id')
@@ -67,5 +85,11 @@ export class UsersController {
     }
 
     await this.usersService.remove(id);
+    await this.auditService.log({
+      actorUserId: currentUser.id,
+      action: 'user.deleted',
+      entityType: 'user',
+      entityId: id,
+    });
   }
 }

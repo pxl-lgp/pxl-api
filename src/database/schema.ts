@@ -11,6 +11,8 @@ import {
 } from 'drizzle-orm/pg-core';
 
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'TEAM', 'CLIENT']);
+export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'DISABLED']);
+export const authTokenPurposeEnum = pgEnum('auth_token_purpose', ['INVITE', 'PASSWORD_RESET']);
 export const clientStatusEnum = pgEnum('client_status', ['LEAD', 'ONBOARDING', 'ACTIVE', 'PAUSED', 'ARCHIVED']);
 export const leadStatusEnum = pgEnum('lead_status', ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST']);
 export const contentStatusEnum = pgEnum('content_status', [
@@ -68,6 +70,35 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   name: text('name').notNull(),
   role: userRoleEnum('role').default('TEAM').notNull(),
+  status: userStatusEnum('status').default('ACTIVE').notNull(),
+  ...timestamps,
+});
+
+export const authTokens = pgTable('auth_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  purpose: authTokenPurposeEnum('purpose').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  ...timestamps,
+});
+
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: uuid('entity_id'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+  ...timestamps,
+});
+
+export const notificationSettings = pgTable('notification_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  eventKey: text('event_key').notNull().unique(),
+  enabled: integer('enabled').default(1).notNull(),
+  recipients: jsonb('recipients').$type<string[]>().default([]).notNull(),
   ...timestamps,
 });
 
@@ -280,6 +311,8 @@ export const reports = pgTable('reports', {
   periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
   summary: text('summary'),
   driveUrl: text('drive_url'),
+  status: text('status').default('DRAFT').notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
   ...timestamps,
 });
 

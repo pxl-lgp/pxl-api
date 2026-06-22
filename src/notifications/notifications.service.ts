@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { AppConfig } from '../config/app.config';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class NotificationsService {
@@ -10,7 +11,10 @@ export class NotificationsService {
   private readonly from: string;
   private readonly teamEmail: string | undefined;
 
-  constructor(private readonly config: ConfigService<AppConfig, true>) {
+  constructor(
+    private readonly config: ConfigService<AppConfig, true>,
+    private readonly settingsService: SettingsService,
+  ) {
     const host = config.get('SMTP_HOST', { infer: true });
     const user = config.get('SMTP_USER', { infer: true });
     const pass = config.get('SMTP_PASS', { infer: true });
@@ -35,14 +39,16 @@ export class NotificationsService {
    * internal notification that just needs a subject + body. Never throws.
    */
   async notifyTeam(subject: string, body: string): Promise<void> {
-    if (!this.transporter || !this.teamEmail) {
+    const recipients = await this.settingsService.getRecipients('new-lead', this.teamEmail);
+
+    if (!this.transporter || recipients.length === 0) {
       return;
     }
 
     try {
       await this.transporter.sendMail({
         from: this.from,
-        to: this.teamEmail,
+        to: recipients,
         subject,
         text: body,
       });
@@ -60,7 +66,9 @@ export class NotificationsService {
     source?: string | null;
     message?: string | null;
   }): Promise<void> {
-    if (!this.transporter || !this.teamEmail) {
+    const recipients = await this.settingsService.getRecipients('client-onboarding', this.teamEmail);
+
+    if (!this.transporter || recipients.length === 0) {
       return;
     }
 
@@ -76,7 +84,7 @@ export class NotificationsService {
     try {
       await this.transporter.sendMail({
         from: this.from,
-        to: this.teamEmail,
+        to: recipients,
         subject: `New lead: ${lead.businessName}`,
         text: lines.join('\n'),
       });
@@ -111,6 +119,24 @@ export class NotificationsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to send onboarding notification email: ${message}`);
+    }
+  }
+
+  async notifyUser(to: string, subject: string, body: string): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject,
+        text: body,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to send user notification "${subject}": ${message}`);
     }
   }
 }

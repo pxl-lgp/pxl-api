@@ -9,5 +9,6 @@ import { AutomationRetryService } from './automation-retry.service';
   imports: [AutomationModule, ClientsModule, ContentModule],
   controllers: [AutomationRetryController],
   providers: [AutomationRetryService],
+  exports: [AutomationRetryService],
 })
 export class AutomationRetryModule {}

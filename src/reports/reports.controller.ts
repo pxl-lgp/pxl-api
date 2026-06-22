@@ -66,4 +66,18 @@ export class ReportsController {
   ): Promise<ReportResponseDto> {
     return this.reportsService.update(id, input);
   }
+
+  @Patch(':id/ready')
+  @ApiOperation({ summary: 'Mark a report as ready for delivery' })
+  @ApiOkResponse({ description: 'Report marked ready.', type: ReportResponseDto })
+  markReady(@Param('id', ParseUUIDPipe) id: string): Promise<ReportResponseDto> {
+    return this.reportsService.markReady(id);
+  }
+
+  @Patch(':id/send')
+  @ApiOperation({ summary: 'Send a report to the client' })
+  @ApiOkResponse({ description: 'Report sent.', type: ReportResponseDto })
+  send(@Param('id', ParseUUIDPipe) id: string): Promise<ReportResponseDto> {
+    return this.reportsService.send(id);
+  }
 }

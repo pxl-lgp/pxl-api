@@ -13,6 +13,9 @@ export class UserResponseDto {
   @ApiProperty({ enum: ['ADMIN', 'TEAM', 'CLIENT'], example: 'ADMIN' })
   role!: 'ADMIN' | 'TEAM' | 'CLIENT';
 
+  @ApiProperty({ enum: ['ACTIVE', 'DISABLED'], example: 'ACTIVE' })
+  status!: 'ACTIVE' | 'DISABLED';
+
   @ApiProperty({ example: '2026-05-30T17:11:56.365Z' })
   createdAt!: Date;
 

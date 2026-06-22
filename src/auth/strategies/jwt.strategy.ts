@@ -32,11 +32,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User no longer exists.');
     }
 
+    if (user.status === 'DISABLED') {
+      throw new UnauthorizedException('User account is disabled.');
+    }
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      status: user.status,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

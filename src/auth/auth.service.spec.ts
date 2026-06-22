@@ -10,18 +10,30 @@ describe('AuthService.login', () => {
   } = {}) => {
     const usersService = {
       findByEmail: overrides.findByEmail ?? jest.fn(),
-      toPublicUser: jest.fn((user: { id: string; email: string; name: string; role: string }) => ({
+      toPublicUser: jest.fn((user: { id: string; email: string; name: string; role: string; status: string }) => ({
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
+        status: user.status,
         createdAt: new Date(),
         updatedAt: new Date(),
       }) as PublicUser),
     } as unknown as UsersService;
     const jwtService = { signAsync: overrides.signAsync ?? jest.fn().mockResolvedValue('signed.jwt.token') };
+    const config = { get: jest.fn().mockReturnValue('http://localhost:3000') };
+    const notificationsService = { notifyUser: jest.fn() };
+    const auditService = { log: jest.fn() };
+    const db = {};
 
-    return new AuthService(jwtService as never, usersService);
+    return new AuthService(
+      jwtService as never,
+      usersService,
+      config as never,
+      notificationsService as never,
+      auditService as never,
+      db as never,
+    );
   };
 
   it('returns an access token and public user on valid credentials', async () => {
@@ -32,6 +44,7 @@ describe('AuthService.login', () => {
         email: 'admin@pxl.test',
         name: 'Admin',
         role: 'ADMIN',
+        status: 'ACTIVE',
         passwordHash,
       }),
     });
@@ -59,6 +72,7 @@ describe('AuthService.login', () => {
         email: 'admin@pxl.test',
         name: 'Admin',
         role: 'ADMIN',
+        status: 'ACTIVE',
         passwordHash,
       }),
     });

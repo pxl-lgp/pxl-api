@@ -21,6 +21,8 @@ export class HealthController {
       status: 'ok',
       service: 'pxl-api',
       timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage().rss,
     };
   }
 

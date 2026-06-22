@@ -11,6 +11,7 @@ import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AssetsModule } from './assets/assets.module';
 import { AssistantModule } from './assistant/assistant.module';
+import { AuditModule } from './audit/audit.module';
 import { AutomationRetryModule } from './automation/automation-retry.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
@@ -27,8 +28,11 @@ import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { OnboardingTasksModule } from './onboarding-tasks/onboarding-tasks.module';
+import { OperationsModule } from './operations/operations.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { SettingsModule } from './settings/settings.module';
 import { SocialConnectionsModule } from './social-connections/social-connections.module';
 import { UsersModule } from './users/users.module';
 
@@ -54,6 +58,7 @@ import { UsersModule } from './users/users.module';
     AnalyticsModule,
     AssetsModule,
     AssistantModule,
+    AuditModule,
     AutomationModule,
     AutomationRetryModule,
     ApprovalsModule,
@@ -68,8 +73,11 @@ import { UsersModule } from './users/users.module';
     LeadsModule,
     OnboardingModule,
     OnboardingTasksModule,
+    OperationsModule,
+    PermissionsModule,
     ReportsModule,
     SchedulerModule,
+    SettingsModule,
     SocialConnectionsModule,
     NotificationsModule,
     HealthModule,

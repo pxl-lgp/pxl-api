@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { UserRole } from '../users.service';
+import { UserRole, UserStatus } from '../users.service';
 
 export class UpdateUserDto {
   @ApiProperty({ example: 'team@pxl.local', required: false })
@@ -18,6 +18,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(['ADMIN', 'TEAM', 'CLIENT'])
   role?: UserRole;
+
+  @ApiProperty({ enum: ['ACTIVE', 'DISABLED'], example: 'ACTIVE', required: false })
+  @IsOptional()
+  @IsEnum(['ACTIVE', 'DISABLED'])
+  status?: UserStatus;
 
   @ApiProperty({ example: 'change-this-password', minLength: 8, required: false })
   @IsOptional()

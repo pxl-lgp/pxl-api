@@ -25,4 +25,10 @@ export class HealthResponseDto {
     required: false,
   })
   database?: string;
+
+  @ApiProperty({ example: 1234, required: false })
+  uptime?: number;
+
+  @ApiProperty({ example: 51200000, required: false })
+  memory?: number;
 }
