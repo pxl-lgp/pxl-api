@@ -38,7 +38,7 @@
     "drizzle-orm": "^0.45.2",
     "googleapis": "^173.0.0",
     "helmet": "^8.2.0",
-    "nodemailer": "^9.0.0",
+    "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.0",
@@ -69,6 +69,10 @@
     "tsx": "^4.22.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.61.0"
+  },
+  "overrides": {
+    "multer": "2.2.0",
+    "esbuild": "0.25.12"
   },
   "packageManager": "pnpm@11.3.0+sha512.2c403d6594527287672b1f7056343a1f7c3634036a67ffabfcc2b3d7595d843768f8787148d1b57cf7956c90606bbd192857c363af19e96d2d0ec9ec5741d215"
 }

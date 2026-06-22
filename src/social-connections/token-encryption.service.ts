@@ -3,14 +3,19 @@ import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { AppConfig } from '../config/app.config';
 
+const IV_LENGTH_BYTES = 12;
+const AUTH_TAG_LENGTH_BYTES = 16;
+
 @Injectable()
 export class TokenEncryptionService {
   constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   encrypt(value: string): string {
     const key = this.getKey();
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const iv = randomBytes(IV_LENGTH_BYTES);
+    const cipher = createCipheriv('aes-256-gcm', key, iv, {
+      authTagLength: AUTH_TAG_LENGTH_BYTES,
+    });
     const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
 
@@ -25,8 +30,17 @@ export class TokenEncryptionService {
       throw new ServiceUnavailableException('Stored social token is not in a supported encrypted format.');
     }
 
-    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivValue, 'base64url'));
-    decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+    const iv = Buffer.from(ivValue, 'base64url');
+    const tag = Buffer.from(tagValue, 'base64url');
+
+    if (iv.length !== IV_LENGTH_BYTES || tag.length !== AUTH_TAG_LENGTH_BYTES) {
+      throw new ServiceUnavailableException('Stored social token is not in a supported encrypted format.');
+    }
+
+    const decipher = createDecipheriv('aes-256-gcm', key, iv, {
+      authTagLength: AUTH_TAG_LENGTH_BYTES,
+    });
+    decipher.setAuthTag(tag);
 
     return Buffer.concat([
       decipher.update(Buffer.from(encryptedValue, 'base64url')),

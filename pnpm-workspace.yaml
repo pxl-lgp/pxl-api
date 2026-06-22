@@ -4,3 +4,6 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
 minimumReleaseAge: 0
+overrides:
+  multer: 2.2.0
+  '@esbuild-kit/core-utils>esbuild': 0.25.12

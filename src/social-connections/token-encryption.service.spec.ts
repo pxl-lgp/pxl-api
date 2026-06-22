@@ -37,6 +37,14 @@ describe('TokenEncryptionService', () => {
     expect(() => service.decrypt('not-valid')).toThrow();
   });
 
+  it('rejects ciphertext with a short auth tag', () => {
+    const service = serviceWithKey(validKey);
+    const [iv, tag, encrypted] = service.encrypt('value').split('.');
+    const shortTag = Buffer.from(tag, 'base64url').subarray(0, 12).toString('base64url');
+
+    expect(() => service.decrypt([iv, shortTag, encrypted].join('.'))).toThrow();
+  });
+
   it('fails when no key is configured', () => {
     const service = serviceWithKey(undefined);
 
