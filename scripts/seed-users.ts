@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { hashSync } from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { organizations, users } from '../src/database/schema';
+import { clients, organizations, users } from '../src/database/schema';
 
 const roles = ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'] as const;
 
@@ -64,6 +64,7 @@ async function seedUsers() {
   const passwordHash = hashSync(password, 12);
   let created = 0;
   let skipped = 0;
+  let clientWorkspacesCreated = 0;
 
   for (const role of roles) {
     for (let index = 1; index <= usersPerRole; index += 1) {
@@ -82,6 +83,9 @@ async function seedUsers() {
       if (existingUser) {
         skipped += 1;
         console.log(`User already exists: ${email}`);
+        if (role === 'CLIENT') {
+          clientWorkspacesCreated += await ensureClientWorkspace(organization.id, email, suffix);
+        }
         continue;
       }
 
@@ -93,12 +97,43 @@ async function seedUsers() {
         role,
         status: 'ACTIVE',
       });
+      if (role === 'CLIENT') {
+        clientWorkspacesCreated += await ensureClientWorkspace(organization.id, email, suffix);
+      }
       created += 1;
       console.log(`Created ${role} user: ${email}`);
     }
   }
 
-  console.log(`Seed users complete. Created: ${created}. Skipped: ${skipped}.`);
+  console.log(
+    `Seed users complete. Created: ${created}. Skipped: ${skipped}. Client workspaces created: ${clientWorkspacesCreated}.`,
+  );
+}
+
+async function ensureClientWorkspace(organizationId: string, email: string, suffix: string): Promise<number> {
+  const [existingClient] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(and(eq(clients.organizationId, organizationId), eq(clients.email, email)))
+    .limit(1);
+
+  if (existingClient) {
+    console.log(`Client workspace already exists: ${email}`);
+    return 0;
+  }
+
+  await db.insert(clients).values({
+    organizationId,
+    businessName: `Seed Client${suffix ? ` ${suffix}` : ''}`,
+    contactPerson: `Client User${suffix ? ` ${suffix}` : ''}`,
+    email,
+    status: 'ACTIVE',
+    servicesNeeded: ['client portal'],
+    socialLinks: {},
+  });
+
+  console.log(`Created client workspace: ${email}`);
+  return 1;
 }
 
 seedUsers()
