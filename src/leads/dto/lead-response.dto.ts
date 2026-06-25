@@ -4,6 +4,9 @@ export class LeadResponseDto {
   @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
   id!: string;
 
+  @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
+  organizationId!: string;
+
   @ApiProperty({ example: 'PXL Sample Restaurant' })
   businessName!: string;
 

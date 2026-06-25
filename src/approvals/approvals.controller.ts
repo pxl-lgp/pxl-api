@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -61,14 +70,21 @@ export class ApprovalsController {
 
   @Get(':id/comments')
   @ApiOperation({ summary: 'List comments on an approval' })
-  @ApiOkResponse({ description: 'Approval comments.', type: ApprovalCommentResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Approval comments.',
+    type: ApprovalCommentResponseDto,
+    isArray: true,
+  })
   findComments(@Param('id', ParseUUIDPipe) id: string): Promise<ApprovalCommentResponseDto[]> {
     return this.approvalsService.findComments(id);
   }
 
   @Post(':id/comments')
   @ApiOperation({ summary: 'Add a team comment to an approval' })
-  @ApiCreatedResponse({ description: 'Approval comment created.', type: ApprovalCommentResponseDto })
+  @ApiCreatedResponse({
+    description: 'Approval comment created.',
+    type: ApprovalCommentResponseDto,
+  })
   createComment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

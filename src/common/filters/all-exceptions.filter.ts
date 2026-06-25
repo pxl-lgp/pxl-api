@@ -28,7 +28,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = context.getResponse<Response>();
     const request = context.getRequest<Request>();
     const isProduction = this.config.get('NODE_ENV', { infer: true }) === 'production';
-    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const status =
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const payload = this.buildPayload(exception, status, request, isProduction);
 
     this.logger.error(
@@ -39,7 +40,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json(payload);
   }
 
-  private buildPayload(exception: unknown, status: number, request: Request, isProduction: boolean) {
+  private buildPayload(
+    exception: unknown,
+    status: number,
+    request: Request,
+    isProduction: boolean,
+  ) {
     const base = {
       statusCode: status,
       error: this.getErrorName(exception, status),

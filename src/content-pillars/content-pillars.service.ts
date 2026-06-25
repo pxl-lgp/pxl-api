@@ -29,10 +29,15 @@ export class ContentPillarsService {
 
       return pillar;
     } catch (error) {
-      throw new OperationError('Failed to create content pillar.', 'content-pillars.create', {
-        stage: 'insert-content-pillar',
-        clientId: input.clientId,
-      }, error);
+      throw new OperationError(
+        'Failed to create content pillar.',
+        'content-pillars.create',
+        {
+          stage: 'insert-content-pillar',
+          clientId: input.clientId,
+        },
+        error,
+      );
     }
   }
 

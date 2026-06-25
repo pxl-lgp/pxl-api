@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
@@ -38,13 +44,21 @@ export class AuthService {
     @Inject(DRIZZLE) private readonly db: Database,
   ) {}
 
-  async register(input: RegisterDto): Promise<PublicUser> {
+  async register(
+    input: RegisterDto,
+    actorUser: { role: string; organizationId: string },
+  ): Promise<PublicUser> {
+    if (input.role === 'SUPER_ADMIN' && actorUser.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Only super admins can create super admins.');
+    }
+
     const passwordHash = await hash(input.password, PASSWORD_SALT_ROUNDS);
 
     // Admins create accounts on behalf of others; they should not receive a
     // session token for the new user. The new user logs in themselves.
     return this.usersService.create({
       email: input.email,
+      organizationId: actorUser.organizationId,
       passwordHash,
       name: input.name,
       role: input.role,
@@ -55,7 +69,10 @@ export class AuthService {
     const user = await this.usersService.findByEmail(input.email);
     // Always run a bcrypt comparison (against a dummy hash when the email is
     // unknown) so response time does not reveal whether the account exists.
-    const passwordMatches = await compare(input.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    const passwordMatches = await compare(
+      input.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+    );
 
     if (!user || !passwordMatches || user.status === 'DISABLED') {
       throw new UnauthorizedException('Invalid email or password.');
@@ -69,10 +86,18 @@ export class AuthService {
     };
   }
 
-  async inviteUser(input: InviteUserDto, actorUserId: string): Promise<PublicUser> {
+  async inviteUser(
+    input: InviteUserDto,
+    actorUser: { id: string; role: string; organizationId: string },
+  ): Promise<PublicUser> {
+    if (input.role === 'SUPER_ADMIN' && actorUser.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Only super admins can invite super admins.');
+    }
+
     const passwordHash = await hash(randomBytes(32).toString('hex'), PASSWORD_SALT_ROUNDS);
     const user = await this.usersService.create({
       email: input.email,
+      organizationId: actorUser.organizationId,
       passwordHash,
       name: input.name.trim(),
       role: input.role,
@@ -86,7 +111,7 @@ export class AuthService {
       `You have been invited to the PXL portal. Set your password here:\n\n${link}\n\nThis link expires in 7 days.`,
     );
     await this.auditService.log({
-      actorUserId,
+      actorUserId: actorUser.id,
       action: 'user.invited',
       entityType: 'user',
       entityId: user.id,
@@ -96,10 +121,13 @@ export class AuthService {
     return user;
   }
 
-  async sendAdminPasswordReset(userId: string, actorUserId: string): Promise<void> {
+  async sendAdminPasswordReset(
+    userId: string,
+    actorUser: { id: string; organizationId: string },
+  ): Promise<void> {
     const user = await this.usersService.findById(userId);
 
-    if (!user) {
+    if (!user || user.organizationId !== actorUser.organizationId) {
       throw new BadRequestException('User not found.');
     }
 
@@ -111,7 +139,7 @@ export class AuthService {
       `An admin requested a password reset for your PXL portal account. Set a new password here:\n\n${link}\n\nThis link expires in 1 hour.`,
     );
     await this.auditService.log({
-      actorUserId,
+      actorUserId: actorUser.id,
       action: 'user.password_reset_sent',
       entityType: 'user',
       entityId: user.id,
@@ -198,7 +226,10 @@ export class AuthService {
     });
   }
 
-  private async createAuthLink(userId: string, purpose: 'INVITE' | 'PASSWORD_RESET'): Promise<string> {
+  private async createAuthLink(
+    userId: string,
+    purpose: 'INVITE' | 'PASSWORD_RESET',
+  ): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + (purpose === 'INVITE' ? 7 * 24 * 60 : 60) * 60 * 1000);
 
@@ -216,9 +247,15 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private async signAccessToken(user: { id: string; email: string; role: string }): Promise<string> {
+  private async signAccessToken(user: {
+    id: string;
+    organizationId: string;
+    email: string;
+    role: string;
+  }): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
+      organizationId: user.organizationId,
       email: user.email,
       role: user.role,
     });

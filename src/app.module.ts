@@ -23,12 +23,14 @@ import { ContentTemplatesModule } from './content-templates/content-templates.mo
 import { validateConfig } from './config/app.config';
 import { DatabaseModule } from './database/database.module';
 import { DriveModule } from './drive/drive.module';
+import { FeatureAccessModule } from './feature-access/feature-access.module';
 import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { OnboardingTasksModule } from './onboarding-tasks/onboarding-tasks.module';
 import { OperationsModule } from './operations/operations.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -70,10 +72,12 @@ import { UsersModule } from './users/users.module';
     ContentPillarsModule,
     ContentTemplatesModule,
     DriveModule,
+    FeatureAccessModule,
     LeadsModule,
     OnboardingModule,
     OnboardingTasksModule,
     OperationsModule,
+    OrganizationsModule,
     PermissionsModule,
     ReportsModule,
     SchedulerModule,

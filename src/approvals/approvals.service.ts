@@ -42,10 +42,15 @@ export class ApprovalsService {
         return approval;
       });
     } catch (error) {
-      throw new OperationError('Failed to create approval.', 'approvals.create', {
-        stage: 'insert-approval',
-        contentItemId: input.contentItemId,
-      }, error);
+      throw new OperationError(
+        'Failed to create approval.',
+        'approvals.create',
+        {
+          stage: 'insert-approval',
+          contentItemId: input.contentItemId,
+        },
+        error,
+      );
     }
   }
 
@@ -138,7 +143,9 @@ export class ApprovalsService {
     return this.db
       .select()
       .from(approvalComments)
-      .where(and(eq(approvalComments.approvalId, approvalId), eq(approvalComments.clientId, clientId)))
+      .where(
+        and(eq(approvalComments.approvalId, approvalId), eq(approvalComments.clientId, clientId)),
+      )
       .orderBy(asc(approvalComments.createdAt));
   }
 
@@ -164,7 +171,10 @@ export class ApprovalsService {
     return comment;
   }
 
-  private async ensureApprovalForClient(approvalId: string, clientId: string): Promise<ApprovalRecord> {
+  private async ensureApprovalForClient(
+    approvalId: string,
+    clientId: string,
+  ): Promise<ApprovalRecord> {
     const [approval] = await this.db
       .select()
       .from(approvals)

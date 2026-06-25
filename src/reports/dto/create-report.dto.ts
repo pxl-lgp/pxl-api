@@ -24,7 +24,9 @@ export class CreateReportDto {
   @IsDate()
   periodEnd!: Date;
 
-  @ApiPropertyOptional({ example: 'Reach improved month over month, with reels driving most engagement.' })
+  @ApiPropertyOptional({
+    example: 'Reach improved month over month, with reels driving most engagement.',
+  })
   @IsOptional()
   @IsString()
   summary?: string;

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -11,9 +21,13 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { BestTimeResult } from './best-time';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { Feature } from '../feature-access/feature.decorator';
+import { FeatureAccessGuard } from '../feature-access/feature-access.guard';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsResponseDto } from './dto/analytics-response.dto';
 import { CreateAnalyticsDto } from './dto/create-analytics.dto';
@@ -21,8 +35,9 @@ import { UpdateAnalyticsDto } from './dto/update-analytics.dto';
 
 @ApiTags('analytics')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 @Roles('ADMIN', 'TEAM')
+@Feature('analytics')
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
@@ -31,10 +46,15 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Create an analytics record for a content item' })
   @ApiCreatedResponse({ description: 'Analytics record created.', type: AnalyticsResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can create analytics records.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can create analytics records.',
+  })
   @ApiNotFoundResponse({ description: 'Content item not found.' })
-  create(@Body() input: CreateAnalyticsDto): Promise<AnalyticsResponseDto> {
-    return this.analyticsService.create(input);
+  create(
+    @Body() input: CreateAnalyticsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AnalyticsResponseDto> {
+    return this.analyticsService.create(input, user.organizationId);
   }
 
   @Get()
@@ -42,8 +62,8 @@ export class AnalyticsController {
   @ApiOkResponse({ description: 'Analytics records.', type: AnalyticsResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list analytics records.' })
-  findAll(): Promise<AnalyticsResponseDto[]> {
-    return this.analyticsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser): Promise<AnalyticsResponseDto[]> {
+    return this.analyticsService.findAll(user.organizationId);
   }
 
   @Get('best-times')
@@ -51,21 +71,31 @@ export class AnalyticsController {
   @ApiQuery({ name: 'clientId', required: false })
   @ApiOkResponse({ description: 'Best-time suggestions.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can view best-time insights.' })
-  getBestTimes(@Query('clientId') clientId?: string): Promise<BestTimeResult> {
-    return this.analyticsService.getBestTimes(clientId);
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can view best-time insights.',
+  })
+  getBestTimes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('clientId') clientId?: string,
+  ): Promise<BestTimeResult> {
+    return this.analyticsService.getBestTimes(user.organizationId, clientId);
   }
 
   @Get('content/:contentItemId')
   @ApiOperation({ summary: 'List analytics records for one content item' })
-  @ApiOkResponse({ description: 'Analytics records for the content item.', type: AnalyticsResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Analytics records for the content item.',
+    type: AnalyticsResponseDto,
+    isArray: true,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view analytics records.' })
   @ApiNotFoundResponse({ description: 'Content item not found.' })
   findForContent(
     @Param('contentItemId', ParseUUIDPipe) contentItemId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<AnalyticsResponseDto[]> {
-    return this.analyticsService.findForContent(contentItemId);
+    return this.analyticsService.findForContent(contentItemId, user.organizationId);
   }
 
   @Get(':id')
@@ -74,20 +104,26 @@ export class AnalyticsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view analytics records.' })
   @ApiNotFoundResponse({ description: 'Analytics record not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<AnalyticsResponseDto> {
-    return this.analyticsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AnalyticsResponseDto> {
+    return this.analyticsService.findOne(id, user.organizationId);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update analytics metrics' })
   @ApiOkResponse({ description: 'Analytics record updated.', type: AnalyticsResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can update analytics records.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can update analytics records.',
+  })
   @ApiNotFoundResponse({ description: 'Analytics record or content item not found.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateAnalyticsDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<AnalyticsResponseDto> {
-    return this.analyticsService.update(id, input);
+    return this.analyticsService.update(id, input, user.organizationId);
   }
 }

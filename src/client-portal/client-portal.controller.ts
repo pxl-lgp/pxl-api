@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -50,7 +59,11 @@ export class ClientPortalController {
 
   @Get('content')
   @ApiOperation({ summary: 'List content visible to the current client' })
-  @ApiOkResponse({ description: 'Client content items.', type: ContentItemResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Client content items.',
+    type: ContentItemResponseDto,
+    isArray: true,
+  })
   getContent(@CurrentUser() user: AuthenticatedUser) {
     return this.clientPortalService.getContentForUser(user);
   }
@@ -76,7 +89,11 @@ export class ClientPortalController {
 
   @Get('approvals/:id/comments')
   @ApiOperation({ summary: 'List comments for a client-visible approval' })
-  @ApiOkResponse({ description: 'Approval comments.', type: ApprovalCommentResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Approval comments.',
+    type: ApprovalCommentResponseDto,
+    isArray: true,
+  })
   getApprovalComments(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

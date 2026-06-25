@@ -33,7 +33,10 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter(config));
   app.enableCors({
-    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
@@ -44,10 +47,15 @@ async function bootstrap() {
     },
   });
 
-  if (config.get('NODE_ENV', { infer: true }) !== 'production' || config.get('ENABLE_SWAGGER', { infer: true })) {
+  if (
+    config.get('NODE_ENV', { infer: true }) !== 'production' ||
+    config.get('ENABLE_SWAGGER', { infer: true })
+  ) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('PXL Automation API')
-      .setDescription('Backend API for PXL Automation operations, workflows, and AI-assisted tools.')
+      .setDescription(
+        'Backend API for PXL Automation operations, workflows, and AI-assisted tools.',
+      )
       .setVersion('0.1.0')
       .addBearerAuth()
       .build();

@@ -4,6 +4,9 @@ export class ClientResponseDto {
   @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
   id!: string;
 
+  @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
+  organizationId!: string;
+
   @ApiProperty({ example: 'PXL Sample Restaurant' })
   businessName!: string;
 
@@ -36,7 +39,10 @@ export class ClientResponseDto {
   @ApiProperty({ example: ['content strategy', 'reels', 'monthly reporting'] })
   servicesNeeded!: string[];
 
-  @ApiProperty({ enum: ['LEAD', 'ONBOARDING', 'ACTIVE', 'PAUSED', 'ARCHIVED'], example: 'ONBOARDING' })
+  @ApiProperty({
+    enum: ['LEAD', 'ONBOARDING', 'ACTIVE', 'PAUSED', 'ARCHIVED'],
+    example: 'ONBOARDING',
+  })
   status!: 'LEAD' | 'ONBOARDING' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
 
   @ApiPropertyOptional({ example: 'https://drive.google.com/drive/folders/example' })

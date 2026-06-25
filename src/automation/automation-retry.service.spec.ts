@@ -6,7 +6,9 @@ import { ContentService } from '../content/content.service';
 
 describe('AutomationRetryService.retry', () => {
   const build = (log: Record<string, unknown>) => {
-    const automationService = { findOne: jest.fn().mockResolvedValue(log) } as unknown as AutomationService;
+    const automationService = {
+      findOne: jest.fn().mockResolvedValue(log),
+    } as unknown as AutomationService;
     const retryDriveProvisioning = jest.fn().mockResolvedValue(undefined);
     const retryCalendarReminder = jest.fn().mockResolvedValue(undefined);
     const clientsService = { retryDriveProvisioning } as unknown as ClientsService;
@@ -20,13 +22,21 @@ describe('AutomationRetryService.retry', () => {
   };
 
   it('rejects a log that is not FAILED', async () => {
-    const { service } = build({ status: 'SUCCEEDED', eventName: 'drive-folder-provisioned', entityId: 'c1' });
+    const { service } = build({
+      status: 'SUCCEEDED',
+      eventName: 'drive-folder-provisioned',
+      entityId: 'c1',
+    });
 
     await expect(service.retry('log-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects a failed log with no entity id', async () => {
-    const { service } = build({ status: 'FAILED', eventName: 'drive-folder-provisioned', entityId: null });
+    const { service } = build({
+      status: 'FAILED',
+      eventName: 'drive-folder-provisioned',
+      entityId: null,
+    });
 
     await expect(service.retry('log-1')).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -41,7 +51,11 @@ describe('AutomationRetryService.retry', () => {
     const result = await service.retry('log-1');
 
     expect(retryDriveProvisioning).toHaveBeenCalledWith('client-1');
-    expect(result).toEqual({ retried: true, eventName: 'drive-folder-provisioned', entityId: 'client-1' });
+    expect(result).toEqual({
+      retried: true,
+      eventName: 'drive-folder-provisioned',
+      entityId: 'client-1',
+    });
   });
 
   it('re-runs the calendar reminder for a failed content-calendar-reminder log', async () => {

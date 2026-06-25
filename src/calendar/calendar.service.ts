@@ -110,9 +110,7 @@ export class CalendarService {
     }
 
     if (Array.isArray(input.hashtags) && input.hashtags.length > 0) {
-      const hashtags = input.hashtags
-        .map((tag) => `#${String(tag).replace(/^#/, '')}`)
-        .join(' ');
+      const hashtags = input.hashtags.map((tag) => `#${String(tag).replace(/^#/, '')}`).join(' ');
       lines.push('', `Hashtags: ${hashtags}`);
     }
 

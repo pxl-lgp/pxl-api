@@ -1,12 +1,12 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { ClientsService } from '../clients/clients.service';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { NotificationsService } from '../notifications/notifications.service';
-import { clients, leads } from '../database/schema';
+import { clients, DEFAULT_ORGANIZATION_ID, leads } from '../database/schema';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { scoreLead } from './lead-scoring';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -24,7 +24,10 @@ export class LeadsService {
     private readonly clientsService: ClientsService,
   ) {}
 
-  async create(input: CreateLeadDto): Promise<LeadRecord> {
+  async create(
+    input: CreateLeadDto,
+    organizationId = DEFAULT_ORGANIZATION_ID,
+  ): Promise<LeadRecord> {
     let lead: LeadRecord;
     const source = input.source ?? 'Website lead form';
     const { score, band, reasons } = scoreLead({
@@ -38,6 +41,7 @@ export class LeadsService {
       [lead] = await this.db
         .insert(leads)
         .values({
+          organizationId,
           businessName: input.businessName,
           contactPerson: input.contactPerson,
           email: input.email.toLowerCase(),
@@ -51,10 +55,15 @@ export class LeadsService {
         })
         .returning();
     } catch (error) {
-      throw new OperationError('Failed to create lead.', 'leads.create', {
-        stage: 'insert-lead',
-        businessName: input.businessName,
-      }, error);
+      throw new OperationError(
+        'Failed to create lead.',
+        'leads.create',
+        {
+          stage: 'insert-lead',
+          businessName: input.businessName,
+        },
+        error,
+      );
     }
 
     // Fire notifications and logging in the background so the public endpoint stays fast.
@@ -94,12 +103,24 @@ export class LeadsService {
     return lead;
   }
 
-  async findAll(): Promise<LeadRecord[]> {
-    return this.db.select().from(leads).orderBy(desc(leads.createdAt));
+  async findAll(organizationId: string): Promise<LeadRecord[]> {
+    return this.db
+      .select()
+      .from(leads)
+      .where(eq(leads.organizationId, organizationId))
+      .orderBy(desc(leads.createdAt));
   }
 
-  async findOne(id: string): Promise<LeadRecord> {
-    const [lead] = await this.db.select().from(leads).where(eq(leads.id, id)).limit(1);
+  async findOne(id: string, organizationId?: string): Promise<LeadRecord> {
+    const [lead] = await this.db
+      .select()
+      .from(leads)
+      .where(
+        organizationId
+          ? and(eq(leads.id, id), eq(leads.organizationId, organizationId))
+          : eq(leads.id, id),
+      )
+      .limit(1);
 
     if (!lead) {
       throw new NotFoundException('Lead not found.');
@@ -108,11 +129,11 @@ export class LeadsService {
     return lead;
   }
 
-  async update(id: string, input: UpdateLeadDto): Promise<LeadRecord> {
-    await this.findOne(id);
+  async update(id: string, input: UpdateLeadDto, organizationId: string): Promise<LeadRecord> {
+    await this.findOne(id, organizationId);
 
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     const [lead] = await this.db
@@ -122,14 +143,14 @@ export class LeadsService {
         email: input.email?.toLowerCase(),
         updatedAt: new Date(),
       })
-      .where(eq(leads.id, id))
+      .where(and(eq(leads.id, id), eq(leads.organizationId, organizationId)))
       .returning();
 
     return lead;
   }
 
-  async convertToClient(id: string): Promise<LeadRecord> {
-    const lead = await this.findOne(id);
+  async convertToClient(id: string, organizationId: string): Promise<LeadRecord> {
+    const lead = await this.findOne(id, organizationId);
 
     if (lead.clientId) {
       throw new BadRequestException('Lead is already linked to a client.');
@@ -141,6 +162,7 @@ export class LeadsService {
       const [createdClient] = await tx
         .insert(clients)
         .values({
+          organizationId: lead.organizationId,
           businessName: lead.businessName,
           contactPerson: lead.contactPerson,
           email: lead.email,
@@ -159,7 +181,7 @@ export class LeadsService {
           clientId: createdClient.id,
           updatedAt: new Date(),
         })
-        .where(eq(leads.id, id))
+        .where(and(eq(leads.id, id), eq(leads.organizationId, organizationId)))
         .returning();
 
       return { client: createdClient, updatedLead: updated };
@@ -173,8 +195,12 @@ export class LeadsService {
     return updatedLead;
   }
 
-  private async ensureClientExists(clientId: string) {
-    const [client] = await this.db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  private async ensureClientExists(clientId: string, organizationId: string) {
+    const [client] = await this.db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
+      .limit(1);
 
     if (!client) {
       throw new NotFoundException('Client not found.');

@@ -10,7 +10,9 @@ async function main() {
   const password = process.argv[3];
 
   if (!email || !password || password.length < 8) {
-    throw new Error('Usage: tsx scripts/reset-admin-password.ts admin@example.com new-password-min-8');
+    throw new Error(
+      'Usage: tsx scripts/reset-admin-password.ts admin@example.com new-password-min-8',
+    );
   }
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });

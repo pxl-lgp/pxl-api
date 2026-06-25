@@ -1,6 +1,13 @@
-import { Inject, Injectable, Logger, NotFoundException, Optional, forwardRef } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { AppConfig } from '../config/app.config';
 import { OperationError } from '../common/errors/operation-error';
@@ -9,7 +16,7 @@ import { Database } from '../database/database.types';
 import { DriveService } from '../drive/drive.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OnboardingTasksService } from '../onboarding-tasks/onboarding-tasks.service';
-import { clients } from '../database/schema';
+import { clients, DEFAULT_ORGANIZATION_ID } from '../database/schema';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
@@ -30,13 +37,17 @@ export class ClientsService {
     private readonly driveService: DriveService | null,
   ) {}
 
-  async create(input: CreateClientDto): Promise<ClientRecord> {
+  async create(
+    input: CreateClientDto,
+    organizationId = DEFAULT_ORGANIZATION_ID,
+  ): Promise<ClientRecord> {
     let client: ClientRecord;
 
     try {
       [client] = await this.db
         .insert(clients)
         .values({
+          organizationId,
           businessName: input.businessName,
           industry: input.industry,
           contactPerson: input.contactPerson,
@@ -51,10 +62,15 @@ export class ClientsService {
         })
         .returning();
     } catch (error) {
-      throw new OperationError('Failed to create client record.', 'clients.create', {
-        stage: 'insert-client',
-        businessName: input.businessName,
-      }, error);
+      throw new OperationError(
+        'Failed to create client record.',
+        'clients.create',
+        {
+          stage: 'insert-client',
+          businessName: input.businessName,
+        },
+        error,
+      );
     }
 
     this.runClientCreatedAutomation(client);
@@ -69,7 +85,10 @@ export class ClientsService {
    * direct client creation and lead-to-client conversion so both paths behave the
    * same way.
    */
-  runClientCreatedAutomation(client: ClientRecord, extraPayload: Record<string, unknown> = {}): void {
+  runClientCreatedAutomation(
+    client: ClientRecord,
+    extraPayload: Record<string, unknown> = {},
+  ): void {
     // Auto-provision a Google Drive folder if Drive is configured and no folder was supplied.
     if (!client.driveFolderUrl) {
       void this.provisionDriveFolder(client);
@@ -89,31 +108,47 @@ export class ClientsService {
       email: client.email,
     });
 
-    void this.automationService.logEvent({
-      eventName: 'client-created',
-      entityType: 'client',
-      entityId: client.id,
-      payload: {
-        clientId: client.id,
-        businessName: client.businessName,
-        industry: client.industry,
-        contactPerson: client.contactPerson,
-        email: client.email,
-        servicesNeeded: client.servicesNeeded,
-        status: client.status,
-        ...extraPayload,
-      },
-    }).catch((error: unknown) => {
-      this.logger.error(`Failed to log client-created event: ${error instanceof Error ? error.message : String(error)}`);
-    });
+    void this.automationService
+      .logEvent({
+        eventName: 'client-created',
+        entityType: 'client',
+        entityId: client.id,
+        payload: {
+          clientId: client.id,
+          businessName: client.businessName,
+          industry: client.industry,
+          contactPerson: client.contactPerson,
+          email: client.email,
+          servicesNeeded: client.servicesNeeded,
+          status: client.status,
+          ...extraPayload,
+        },
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Failed to log client-created event: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
   }
 
-  async findAll(): Promise<ClientRecord[]> {
-    return this.db.select().from(clients).orderBy(desc(clients.createdAt));
+  async findAll(organizationId: string): Promise<ClientRecord[]> {
+    return this.db
+      .select()
+      .from(clients)
+      .where(eq(clients.organizationId, organizationId))
+      .orderBy(desc(clients.createdAt));
   }
 
-  async findOne(id: string): Promise<ClientRecord> {
-    const [client] = await this.db.select().from(clients).where(eq(clients.id, id)).limit(1);
+  async findOne(id: string, organizationId?: string): Promise<ClientRecord> {
+    const [client] = await this.db
+      .select()
+      .from(clients)
+      .where(
+        organizationId
+          ? and(eq(clients.id, id), eq(clients.organizationId, organizationId))
+          : eq(clients.id, id),
+      )
+      .limit(1);
 
     if (!client) {
       throw new NotFoundException('Client not found.');
@@ -122,8 +157,8 @@ export class ClientsService {
     return client;
   }
 
-  async update(id: string, input: UpdateClientDto): Promise<ClientRecord> {
-    await this.findOne(id);
+  async update(id: string, input: UpdateClientDto, organizationId: string): Promise<ClientRecord> {
+    await this.findOne(id, organizationId);
 
     const [client] = await this.db
       .update(clients)
@@ -132,7 +167,7 @@ export class ClientsService {
         email: input.email?.toLowerCase(),
         updatedAt: new Date(),
       })
-      .where(eq(clients.id, id))
+      .where(and(eq(clients.id, id), eq(clients.organizationId, organizationId)))
       .returning();
 
     return client;

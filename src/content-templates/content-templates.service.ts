@@ -32,10 +32,15 @@ export class ContentTemplatesService {
 
       return template;
     } catch (error) {
-      throw new OperationError('Failed to create content template.', 'content-templates.create', {
-        stage: 'insert-content-template',
-        clientId: input.clientId,
-      }, error);
+      throw new OperationError(
+        'Failed to create content template.',
+        'content-templates.create',
+        {
+          stage: 'insert-content-template',
+          clientId: input.clientId,
+        },
+        error,
+      );
     }
   }
 

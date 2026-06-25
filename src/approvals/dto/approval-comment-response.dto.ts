@@ -16,8 +16,8 @@ export class ApprovalCommentResponseDto {
   @ApiProperty({ example: 'PXL Admin' })
   authorName!: string;
 
-  @ApiProperty({ enum: ['ADMIN', 'TEAM', 'CLIENT'], example: 'TEAM' })
-  authorRole!: 'ADMIN' | 'TEAM' | 'CLIENT';
+  @ApiProperty({ enum: ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'], example: 'TEAM' })
+  authorRole!: 'SUPER_ADMIN' | 'ADMIN' | 'TEAM' | 'CLIENT';
 
   @ApiProperty({ example: 'Can we make the CTA stronger before publishing?' })
   body!: string;

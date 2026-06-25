@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { users } from '../database/schema';
@@ -8,7 +8,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
-export type UserRole = 'ADMIN' | 'TEAM' | 'CLIENT';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEAM' | 'CLIENT';
 export type UserStatus = 'ACTIVE' | 'DISABLED';
 
 export type UserRecord = typeof users.$inferSelect;
@@ -20,6 +20,7 @@ export class UsersService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
   async create(input: {
+    organizationId: string;
     email: string;
     passwordHash: string;
     name: string;
@@ -36,6 +37,7 @@ export class UsersService {
       .insert(users)
       .values({
         email: input.email.toLowerCase(),
+        organizationId: input.organizationId,
         passwordHash: input.passwordHash,
         name: input.name,
         role: input.role ?? 'TEAM',
@@ -62,14 +64,24 @@ export class UsersService {
     return user;
   }
 
-  async findAll(): Promise<PublicUser[]> {
+  async findAll(organizationId: string): Promise<PublicUser[]> {
+    const records = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.organizationId, organizationId))
+      .orderBy(desc(users.createdAt));
+
+    return records.map((user) => this.toPublicUser(user));
+  }
+
+  async findAllAcrossOrganizations(): Promise<PublicUser[]> {
     const records = await this.db.select().from(users).orderBy(desc(users.createdAt));
 
     return records.map((user) => this.toPublicUser(user));
   }
 
-  async update(id: string, input: UpdateUserDto): Promise<PublicUser> {
-    await this.requireUser(id);
+  async update(id: string, input: UpdateUserDto, organizationId?: string): Promise<PublicUser> {
+    await this.requireUser(id, organizationId);
 
     const email = input.email?.trim().toLowerCase();
 
@@ -85,7 +97,9 @@ export class UsersService {
       }
     }
 
-    const passwordHash = input.password ? await hash(input.password, PASSWORD_SALT_ROUNDS) : undefined;
+    const passwordHash = input.password
+      ? await hash(input.password, PASSWORD_SALT_ROUNDS)
+      : undefined;
     const [updatedUser] = await this.db
       .update(users)
       .set({
@@ -102,13 +116,21 @@ export class UsersService {
     return this.toPublicUser(updatedUser);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.requireUser(id);
+  async remove(id: string, organizationId: string): Promise<void> {
+    await this.requireUser(id, organizationId);
     await this.db.delete(users).where(eq(users.id, id));
   }
 
-  private async requireUser(id: string): Promise<UserRecord> {
-    const user = await this.findById(id);
+  private async requireUser(id: string, organizationId?: string): Promise<UserRecord> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(
+        organizationId
+          ? and(eq(users.id, id), eq(users.organizationId, organizationId))
+          : eq(users.id, id),
+      )
+      .limit(1);
 
     if (!user) {
       throw new NotFoundException('User not found.');
@@ -120,6 +142,7 @@ export class UsersService {
   toPublicUser(user: UserRecord): PublicUser {
     const publicUser: PublicUser = {
       id: user.id,
+      organizationId: user.organizationId,
       email: user.email,
       name: user.name,
       role: user.role,

@@ -19,6 +19,11 @@ import { AutomationRetrySchedulerService } from './automation-retry-scheduler.se
     NotificationsModule,
     SocialConnectionsModule,
   ],
-  providers: [ContentPublisherService, RemindersService, MetaInsightsIngestionService, AutomationRetrySchedulerService],
+  providers: [
+    ContentPublisherService,
+    RemindersService,
+    MetaInsightsIngestionService,
+    AutomationRetrySchedulerService,
+  ],
 })
 export class SchedulerModule {}

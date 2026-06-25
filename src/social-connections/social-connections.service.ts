@@ -127,14 +127,15 @@ export class SocialConnectionsService {
       throw new BadGatewayException('Meta did not return the authorizing user ID.');
     }
 
-    const permissions = await this.metaGet<MetaPermissionResponse>('me/permissions', token.accessToken);
+    const permissions = await this.metaGet<MetaPermissionResponse>(
+      'me/permissions',
+      token.accessToken,
+    );
     const grantedScopes =
       permissions.data
         ?.filter((permission) => permission.status === 'granted')
         .map((permission) => permission.permission) ?? [];
-    const tokenExpiresAt = token.expiresIn
-      ? new Date(Date.now() + token.expiresIn * 1000)
-      : null;
+    const tokenExpiresAt = token.expiresIn ? new Date(Date.now() + token.expiresIn * 1000) : null;
     const authorization = await this.upsertAuthorization({
       clientId: oauthState.clientId,
       connectedByUserId: oauthState.createdByUserId,
@@ -189,12 +190,7 @@ export class SocialConnectionsService {
         status: 'REVOKED',
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(socialConnections.id, connectionId),
-          eq(socialConnections.clientId, clientId),
-        ),
-      )
+      .where(and(eq(socialConnections.id, connectionId), eq(socialConnections.clientId, clientId)))
       .returning();
 
     if (!connection) {
@@ -222,10 +218,7 @@ export class SocialConnectionsService {
       .select()
       .from(metaAuthorizations)
       .where(
-        and(
-          eq(metaAuthorizations.id, authorizationId),
-          eq(metaAuthorizations.clientId, clientId),
-        ),
+        and(eq(metaAuthorizations.id, authorizationId), eq(metaAuthorizations.clientId, clientId)),
       )
       .limit(1);
 
@@ -268,12 +261,7 @@ export class SocialConnectionsService {
     const [state] = await this.db
       .select()
       .from(metaOauthStates)
-      .where(
-        and(
-          eq(metaOauthStates.nonceHash, nonceHash),
-          isNull(metaOauthStates.usedAt),
-        ),
-      )
+      .where(and(eq(metaOauthStates.nonceHash, nonceHash), isNull(metaOauthStates.usedAt)))
       .limit(1);
 
     if (!state || state.expiresAt <= new Date()) {
@@ -283,12 +271,7 @@ export class SocialConnectionsService {
     const [consumed] = await this.db
       .update(metaOauthStates)
       .set({ usedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(metaOauthStates.id, state.id),
-          isNull(metaOauthStates.usedAt),
-        ),
-      )
+      .where(and(eq(metaOauthStates.id, state.id), isNull(metaOauthStates.usedAt)))
       .returning();
 
     if (!consumed) {
@@ -465,8 +448,7 @@ export class SocialConnectionsService {
           facebookPageName: page.name,
           instagramAccountId: page.instagram_business_account?.id,
           instagramUsername:
-            page.instagram_business_account?.username ??
-            page.instagram_business_account?.name,
+            page.instagram_business_account?.username ?? page.instagram_business_account?.name,
           pageAccessTokenEncrypted: this.tokenEncryption.encrypt(page.access_token),
           tokenExpiresAt: input.tokenExpiresAt,
           status: 'CONNECTED' as const,

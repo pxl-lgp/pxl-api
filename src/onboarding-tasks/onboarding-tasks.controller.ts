@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -27,7 +36,11 @@ export class OnboardingTasksController {
   @Get()
   @ApiOperation({ summary: 'List the onboarding checklist for a client' })
   @ApiQuery({ name: 'clientId', required: true })
-  @ApiOkResponse({ description: 'Onboarding tasks.', type: OnboardingTaskResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Onboarding tasks.',
+    type: OnboardingTaskResponseDto,
+    isArray: true,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view onboarding tasks.' })
   @ApiNotFoundResponse({ description: 'Client not found.' })
@@ -42,7 +55,9 @@ export class OnboardingTasksController {
   @ApiOperation({ summary: 'Update an onboarding task status or details' })
   @ApiOkResponse({ description: 'Onboarding task updated.', type: OnboardingTaskResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can update onboarding tasks.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can update onboarding tasks.',
+  })
   @ApiNotFoundResponse({ description: 'Onboarding task not found.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,

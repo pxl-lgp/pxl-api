@@ -123,7 +123,12 @@ export class ContentPublisherService {
       entityId: item.id,
       status: 'FAILED',
       errorMessage: message,
-      payload: { title: item.title, clientId: item.clientId, attempts, maxAttempts: MAX_PUBLISH_ATTEMPTS },
+      payload: {
+        title: item.title,
+        clientId: item.clientId,
+        attempts,
+        maxAttempts: MAX_PUBLISH_ATTEMPTS,
+      },
     });
   }
 

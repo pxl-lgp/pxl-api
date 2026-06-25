@@ -82,7 +82,9 @@ export class AiController {
   }
 
   @Post('analyze-performance')
-  @ApiOperation({ summary: 'Generate AI performance insights and recommendations from analytics metrics' })
+  @ApiOperation({
+    summary: 'Generate AI performance insights and recommendations from analytics metrics',
+  })
   @ApiOkResponse({ type: AiGenerationResponseDto })
   analyzePerformance(@Body() input: AnalyzePerformanceDto): Promise<AiGenerationResponseDto> {
     return this.aiService.analyzePerformance(input);

@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { UpdateApprovalDto } from '../approvals/dto/update-approval.dto';
 import { ApprovalsService } from '../approvals/approvals.service';
@@ -137,7 +143,11 @@ export class ClientPortalService {
     return this.approvalsService.findClientComments(client.id, approvalId);
   }
 
-  async createApprovalComment(user: AuthenticatedUser, approvalId: string, input: CreateApprovalCommentDto) {
+  async createApprovalComment(
+    user: AuthenticatedUser,
+    approvalId: string,
+    input: CreateApprovalCommentDto,
+  ) {
     const client = await this.getClientForUser(user);
 
     return this.approvalsService.createClientComment(client.id, approvalId, user, input);
@@ -160,10 +170,18 @@ export class ClientPortalService {
   }
 
   private getAssets(clientId: string) {
-    return this.db.select().from(assets).where(eq(assets.clientId, clientId)).orderBy(desc(assets.createdAt));
+    return this.db
+      .select()
+      .from(assets)
+      .where(eq(assets.clientId, clientId))
+      .orderBy(desc(assets.createdAt));
   }
 
   private getReports(clientId: string) {
-    return this.db.select().from(reports).where(eq(reports.clientId, clientId)).orderBy(desc(reports.createdAt));
+    return this.db
+      .select()
+      .from(reports)
+      .where(eq(reports.clientId, clientId))
+      .orderBy(desc(reports.createdAt));
   }
 }

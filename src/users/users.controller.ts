@@ -1,4 +1,14 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -34,8 +44,12 @@ export class UsersController {
   @ApiOkResponse({ description: 'User list.', type: UserResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins can list users.' })
-  findAll(): Promise<UserResponseDto[]> {
-    return this.usersService.findAll();
+  findAll(@CurrentUser() currentUser: AuthenticatedUser): Promise<UserResponseDto[]> {
+    if (currentUser.role === 'SUPER_ADMIN') {
+      return this.usersService.findAllAcrossOrganizations();
+    }
+
+    return this.usersService.findAll(currentUser.organizationId);
   }
 
   @Patch(':id')
@@ -57,7 +71,7 @@ export class UsersController {
       throw new BadRequestException('You cannot disable your own account.');
     }
 
-    return this.usersService.update(id, input).then(async (user) => {
+    return this.usersService.update(id, input, currentUser.organizationId).then(async (user) => {
       await this.auditService.log({
         actorUserId: currentUser.id,
         action: 'user.updated',
@@ -84,7 +98,7 @@ export class UsersController {
       throw new BadRequestException('You cannot delete your own account.');
     }
 
-    await this.usersService.remove(id);
+    await this.usersService.remove(id, currentUser.organizationId);
     await this.auditService.log({
       actorUserId: currentUser.id,
       action: 'user.deleted',

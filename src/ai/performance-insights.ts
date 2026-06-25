@@ -55,7 +55,9 @@ export function summarizePerformance(input: PerformanceInput): string {
     recommendations.push('No reach yet — confirm the post is published and metrics are captured.');
   } else {
     if (engagementRate < 2) {
-      recommendations.push('Engagement is low — test a stronger hook and a clearer call to action.');
+      recommendations.push(
+        'Engagement is low — test a stronger hook and a clearer call to action.',
+      );
     } else if (engagementRate > 6) {
       recommendations.push('Strong engagement — repurpose this angle into more formats.');
     }
@@ -77,5 +79,7 @@ export function summarizePerformance(input: PerformanceInput): string {
     recommendations.push('Metrics are healthy — keep the current content direction.');
   }
 
-  return [...lines, '', 'Recommendations:', ...recommendations.map((item) => `- ${item}`)].join('\n');
+  return [...lines, '', 'Recommendations:', ...recommendations.map((item) => `- ${item}`)].join(
+    '\n',
+  );
 }

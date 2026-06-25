@@ -18,11 +18,7 @@ export function normalizeSocialPlatforms(
 
   const results: SocialPlatform[] = [];
 
-  if (
-    normalized.includes('facebook') ||
-    normalized === 'fb' ||
-    normalized.startsWith('fb.')
-  ) {
+  if (normalized.includes('facebook') || normalized === 'fb' || normalized.startsWith('fb.')) {
     results.push('FACEBOOK_PAGE');
   }
 

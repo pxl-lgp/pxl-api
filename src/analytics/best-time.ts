@@ -15,11 +15,24 @@ export type BestTimeResult = {
   sampleSize: number;
   topSlots: BestTimeSlot[];
   bestHours: Array<{ hour: number; avgEngagement: number; sampleSize: number }>;
-  bestWeekdays: Array<{ weekday: number; weekdayLabel: string; avgEngagement: number; sampleSize: number }>;
+  bestWeekdays: Array<{
+    weekday: number;
+    weekdayLabel: string;
+    avgEngagement: number;
+    sampleSize: number;
+  }>;
   note: string;
 };
 
-const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAY_LABELS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 function average(values: number[]): number {
   if (values.length === 0) {
@@ -37,7 +50,9 @@ function average(values: number[]): number {
  * not enough history yet.
  */
 export function computeBestTimes(rows: PublishedEngagement[]): BestTimeResult {
-  const valid = rows.filter((row): row is { publishedAt: Date; engagement: number } => row.publishedAt != null);
+  const valid = rows.filter(
+    (row): row is { publishedAt: Date; engagement: number } => row.publishedAt != null,
+  );
 
   if (valid.length < 3) {
     return {

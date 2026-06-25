@@ -15,7 +15,7 @@ export const DEFAULT_ONBOARDING_TASKS: DefaultOnboardingTask[] = [
   },
   {
     title: 'Connect social media accounts',
-    description: 'Link the client\'s Facebook Page(s) and Instagram via Meta OAuth.',
+    description: "Link the client's Facebook Page(s) and Instagram via Meta OAuth.",
   },
   {
     title: 'Define content pillars & monthly plan',

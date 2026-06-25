@@ -24,7 +24,11 @@ describe('shouldRemind', () => {
   });
 
   it('respects custom thresholds', () => {
-    expect(shouldRemind({ createdAt: hoursAgo(3), lastReminderAt: null }, now, 2 * HOUR_MS)).toBe(true);
-    expect(shouldRemind({ createdAt: hoursAgo(1), lastReminderAt: null }, now, 2 * HOUR_MS)).toBe(false);
+    expect(shouldRemind({ createdAt: hoursAgo(3), lastReminderAt: null }, now, 2 * HOUR_MS)).toBe(
+      true,
+    );
+    expect(shouldRemind({ createdAt: hoursAgo(1), lastReminderAt: null }, now, 2 * HOUR_MS)).toBe(
+      false,
+    );
   });
 });

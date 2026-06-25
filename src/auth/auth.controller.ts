@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -38,8 +47,11 @@ export class AuthController {
   @ApiCreatedResponse({ description: 'User registered.', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins can register users.' })
-  register(@Body() input: RegisterDto): Promise<UserResponseDto> {
-    return this.authService.register(input);
+  register(
+    @Body() input: RegisterDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<UserResponseDto> {
+    return this.authService.register(input, user);
   }
 
   @Post('invite')
@@ -54,7 +66,7 @@ export class AuthController {
     @Body() input: InviteUserDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<UserResponseDto> {
-    return this.authService.inviteUser(input, user.id);
+    return this.authService.inviteUser(input, user);
   }
 
   @Post('login')
@@ -94,7 +106,7 @@ export class AuthController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
-    await this.authService.sendAdminPasswordReset(id, user.id);
+    await this.authService.sendAdminPasswordReset(id, user);
   }
 
   @Get('me')

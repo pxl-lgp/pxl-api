@@ -16,9 +16,7 @@ export class MetaOauthCallbackController {
 
   @Get('callback')
   async callback(@Query() query: MetaCallbackDto, @Res() response: Response) {
-    const frontendUrl = this.config
-      .get('FRONTEND_URL', { infer: true })
-      .replace(/\/$/, '');
+    const frontendUrl = this.config.get('FRONTEND_URL', { infer: true }).replace(/\/$/, '');
 
     if (query.error || !query.code || !query.state) {
       const message = query.error_description ?? query.error ?? 'Meta authorization was cancelled.';
@@ -29,13 +27,8 @@ export class MetaOauthCallbackController {
     }
 
     try {
-      const result = await this.socialConnectionsService.completeMetaOauth(
-        query.code,
-        query.state,
-      );
-      response.redirect(
-        `${frontendUrl}/meta-connected?status=success&pages=${result.pageCount}`,
-      );
+      const result = await this.socialConnectionsService.completeMetaOauth(query.code, query.state);
+      response.redirect(`${frontendUrl}/meta-connected?status=success&pages=${result.pageCount}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Meta connection failed.';
       response.redirect(

@@ -92,6 +92,20 @@
       "when": 1782146000000,
       "tag": "0012_ops_growth_features",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782147000000,
+      "tag": "0013_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1782148000000,
+      "tag": "0014_super_admin_feature_access",
+      "breakpoints": true
     }
   ]
 }

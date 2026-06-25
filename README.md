@@ -50,6 +50,20 @@ Recommended local Node version:
    npm run seed:admin
    ```
 
+   Or seed one user for each role (`SUPER_ADMIN`, `ADMIN`, `TEAM`, `CLIENT`):
+
+   ```bash
+   npm run seed:users
+   ```
+
+   The default seed password is `change-this-password`. Optional seed values: `SEED_USERS_PASSWORD`, `SEED_ORGANIZATION_NAME`, `SEED_ORGANIZATION_SLUG`, `SEED_USERS_EMAIL_DOMAIN`, `SEED_USERS_PER_ROLE`.
+
+   To create only the platform-level super admin:
+
+   ```bash
+   npm run seed:super-admin
+   ```
+
 7. Run the API:
 
    ```bash

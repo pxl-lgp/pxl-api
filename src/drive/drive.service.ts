@@ -136,8 +136,7 @@ export class DriveService {
       }),
       drive.files.list({
         q: `'${this.escapeQueryValue(currentFolderId)}' in parents and trashed = false`,
-        fields:
-          'files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,parents)',
+        fields: 'files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,parents)',
         orderBy: 'folder,name_natural',
         pageSize: 200,
         supportsAllDrives: true,
@@ -291,7 +290,9 @@ export class DriveService {
 
       return response.data;
     } catch {
-      throw new NotFoundException('Google Drive item not found or not shared with the service account.');
+      throw new NotFoundException(
+        'Google Drive item not found or not shared with the service account.',
+      );
     }
   }
 

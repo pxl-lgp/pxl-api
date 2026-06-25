@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -10,8 +20,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { Feature } from '../feature-access/feature.decorator';
+import { FeatureAccessGuard } from '../feature-access/feature-access.guard';
 import { AssetsService } from './assets.service';
 import { AssetQueryDto } from './dto/asset-query.dto';
 import { AssetResponseDto } from './dto/asset-response.dto';
@@ -20,8 +34,9 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 
 @ApiTags('assets')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 @Roles('ADMIN', 'TEAM')
+@Feature('assets')
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
@@ -32,17 +47,25 @@ export class AssetsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can create assets.' })
   @ApiNotFoundResponse({ description: 'Client or content item not found.' })
-  create(@Body() input: CreateAssetDto): Promise<AssetResponseDto> {
-    return this.assetsService.create(input);
+  create(
+    @Body() input: CreateAssetDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AssetResponseDto> {
+    return this.assetsService.create(input, user.organizationId);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List assets, optionally filtered by client, content item, type, or name search' })
+  @ApiOperation({
+    summary: 'List assets, optionally filtered by client, content item, type, or name search',
+  })
   @ApiOkResponse({ description: 'Assets.', type: AssetResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list assets.' })
-  findAll(@Query() query: AssetQueryDto): Promise<AssetResponseDto[]> {
-    return this.assetsService.findAll(query);
+  findAll(
+    @Query() query: AssetQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AssetResponseDto[]> {
+    return this.assetsService.findAll(query, user.organizationId);
   }
 
   @Get(':id')
@@ -51,8 +74,11 @@ export class AssetsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view assets.' })
   @ApiNotFoundResponse({ description: 'Asset not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<AssetResponseDto> {
-    return this.assetsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AssetResponseDto> {
+    return this.assetsService.findOne(id, user.organizationId);
   }
 
   @Patch(':id')
@@ -64,8 +90,9 @@ export class AssetsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateAssetDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<AssetResponseDto> {
-    return this.assetsService.update(id, input);
+    return this.assetsService.update(id, input, user.organizationId);
   }
 
   @Post(':id/auto-tag')
@@ -74,7 +101,10 @@ export class AssetsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can tag assets.' })
   @ApiNotFoundResponse({ description: 'Asset not found.' })
-  autoTag(@Param('id', ParseUUIDPipe) id: string): Promise<AssetResponseDto> {
-    return this.assetsService.autoTag(id);
+  autoTag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AssetResponseDto> {
+    return this.assetsService.autoTag(id, user.organizationId);
   }
 }

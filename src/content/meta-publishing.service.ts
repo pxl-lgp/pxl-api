@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/app.config';
 import { TokenEncryptionService } from '../social-connections/token-encryption.service';
@@ -40,9 +36,7 @@ export class MetaPublishingService {
   ) {}
 
   async publish(input: MetaPublishInput): Promise<{ remoteId: string }> {
-    const accessToken = this.tokenEncryption.decrypt(
-      input.connection.pageAccessTokenEncrypted,
-    );
+    const accessToken = this.tokenEncryption.decrypt(input.connection.pageAccessTokenEncrypted);
 
     if (input.platform === 'FACEBOOK_PAGE') {
       return this.publishFacebookPage(input, accessToken);
@@ -98,7 +92,9 @@ export class MetaPublishingService {
     const remoteId = response.post_id ?? response.id;
 
     if (!remoteId) {
-      throw new BadGatewayException('Meta accepted the Facebook request without returning a post ID.');
+      throw new BadGatewayException(
+        'Meta accepted the Facebook request without returning a post ID.',
+      );
     }
 
     return { remoteId };
@@ -117,7 +113,9 @@ export class MetaPublishingService {
     }
 
     if (!input.mediaUrl) {
-      throw new BadRequestException('Instagram publishing requires a publicly reachable media URL.');
+      throw new BadRequestException(
+        'Instagram publishing requires a publicly reachable media URL.',
+      );
     }
 
     const isVideo = this.isVideo(input.contentType, input.mediaUrl);
@@ -155,10 +153,7 @@ export class MetaPublishingService {
 
   private async waitForInstagramContainer(containerId: string, accessToken: string): Promise<void> {
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const status = await this.metaGet(
-        `${containerId}?fields=status_code`,
-        accessToken,
-      );
+      const status = await this.metaGet(`${containerId}?fields=status_code`, accessToken);
 
       if (status.status_code === 'FINISHED') {
         return;

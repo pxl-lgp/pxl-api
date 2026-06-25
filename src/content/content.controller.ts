@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -10,8 +20,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { Feature } from '../feature-access/feature.decorator';
+import { FeatureAccessGuard } from '../feature-access/feature-access.guard';
 import { ContentService } from './content.service';
 import { ContentItemResponseDto } from './dto/content-item-response.dto';
 import { ContentQueryDto } from './dto/content-query.dto';
@@ -21,8 +35,9 @@ import { UpdateContentItemDto } from './dto/update-content-item.dto';
 
 @ApiTags('content')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 @Roles('ADMIN', 'TEAM')
+@Feature('content')
 @Controller('content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
@@ -33,17 +48,25 @@ export class ContentController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can create content.' })
   @ApiNotFoundResponse({ description: 'Client not found.' })
-  create(@Body() input: CreateContentItemDto): Promise<ContentItemResponseDto> {
-    return this.contentService.create(input);
+  create(
+    @Body() input: CreateContentItemDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentItemResponseDto> {
+    return this.contentService.create(input, user.organizationId);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List content items, optionally filtered by client, status, type, or title search' })
+  @ApiOperation({
+    summary: 'List content items, optionally filtered by client, status, type, or title search',
+  })
   @ApiOkResponse({ description: 'Content items.', type: ContentItemResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list content.' })
-  findAll(@Query() query: ContentQueryDto): Promise<ContentItemResponseDto[]> {
-    return this.contentService.findAll(query);
+  findAll(
+    @Query() query: ContentQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentItemResponseDto[]> {
+    return this.contentService.findAll(query, user.organizationId);
   }
 
   @Get(':id')
@@ -52,8 +75,11 @@ export class ContentController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view content.' })
   @ApiNotFoundResponse({ description: 'Content item not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ContentItemResponseDto> {
-    return this.contentService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentItemResponseDto> {
+    return this.contentService.findOne(id, user.organizationId);
   }
 
   @Patch(':id/schedule')
@@ -65,18 +91,25 @@ export class ContentController {
   schedule(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: ScheduleContentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ContentItemResponseDto> {
-    return this.contentService.schedule(id, input);
+    return this.contentService.schedule(id, input, user.organizationId);
   }
 
   @Patch(':id/publish')
   @ApiOperation({ summary: 'Publish a content item to its selected social platforms' })
-  @ApiOkResponse({ description: 'Content item published to all selected platforms.', type: ContentItemResponseDto })
+  @ApiOkResponse({
+    description: 'Content item published to all selected platforms.',
+    type: ContentItemResponseDto,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can publish content.' })
   @ApiNotFoundResponse({ description: 'Content item not found.' })
-  publish(@Param('id', ParseUUIDPipe) id: string): Promise<ContentItemResponseDto> {
-    return this.contentService.publish(id);
+  publish(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentItemResponseDto> {
+    return this.contentService.publish(id, user.organizationId);
   }
 
   @Patch(':id')
@@ -88,7 +121,8 @@ export class ContentController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateContentItemDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ContentItemResponseDto> {
-    return this.contentService.update(id, input);
+    return this.contentService.update(id, input, user.organizationId);
   }
 }

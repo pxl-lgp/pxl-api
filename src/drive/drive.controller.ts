@@ -13,13 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,10 +31,7 @@ export class DriveController {
 
   @Get('items')
   @ApiOperation({ summary: 'List files and folders in a client Drive workspace' })
-  list(
-    @Param('clientId', ParseUUIDPipe) clientId: string,
-    @Query('folderId') folderId?: string,
-  ) {
+  list(@Param('clientId', ParseUUIDPipe) clientId: string, @Query('folderId') folderId?: string) {
     return this.driveService.listClientFolder(clientId, folderId);
   }
 
@@ -91,10 +82,7 @@ export class DriveController {
 
   @Delete('items/:fileId')
   @ApiOperation({ summary: 'Delete a file or folder from a client Drive workspace' })
-  remove(
-    @Param('clientId', ParseUUIDPipe) clientId: string,
-    @Param('fileId') fileId: string,
-  ) {
+  remove(@Param('clientId', ParseUUIDPipe) clientId: string, @Param('fileId') fileId: string) {
     return this.driveService.deleteItem(clientId, fileId);
   }
 }

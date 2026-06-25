@@ -27,14 +27,18 @@ export class TokenEncryptionService {
     const [ivValue, tagValue, encryptedValue] = value.split('.');
 
     if (!ivValue || !tagValue || !encryptedValue) {
-      throw new ServiceUnavailableException('Stored social token is not in a supported encrypted format.');
+      throw new ServiceUnavailableException(
+        'Stored social token is not in a supported encrypted format.',
+      );
     }
 
     const iv = Buffer.from(ivValue, 'base64url');
     const tag = Buffer.from(tagValue, 'base64url');
 
     if (iv.length !== IV_LENGTH_BYTES || tag.length !== AUTH_TAG_LENGTH_BYTES) {
-      throw new ServiceUnavailableException('Stored social token is not in a supported encrypted format.');
+      throw new ServiceUnavailableException(
+        'Stored social token is not in a supported encrypted format.',
+      );
     }
 
     const decipher = createDecipheriv('aes-256-gcm', key, iv, {

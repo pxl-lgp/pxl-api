@@ -17,8 +17,12 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
-  @ApiProperty({ enum: ['ADMIN', 'TEAM', 'CLIENT'], example: 'TEAM', required: false })
+  @ApiProperty({
+    enum: ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'],
+    example: 'TEAM',
+    required: false,
+  })
   @IsOptional()
-  @IsEnum(['ADMIN', 'TEAM', 'CLIENT'])
+  @IsEnum(['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'])
   role?: UserRole;
 }

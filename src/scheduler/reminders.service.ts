@@ -68,10 +68,7 @@ export class RemindersService {
     );
 
     for (const item of due) {
-      await this.db
-        .update(approvals)
-        .set({ lastReminderAt: now })
-        .where(eq(approvals.id, item.id));
+      await this.db.update(approvals).set({ lastReminderAt: now }).where(eq(approvals.id, item.id));
 
       void this.automationService.logEvent({
         eventName: 'approval-reminder',
@@ -109,10 +106,7 @@ export class RemindersService {
     );
 
     for (const item of due) {
-      await this.db
-        .update(leads)
-        .set({ lastReminderAt: now })
-        .where(eq(leads.id, item.id));
+      await this.db.update(leads).set({ lastReminderAt: now }).where(eq(leads.id, item.id));
 
       void this.automationService.logEvent({
         eventName: 'lead-follow-up-reminder',

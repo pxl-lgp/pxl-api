@@ -18,11 +18,7 @@ import {
 import { CreateContentItemDto } from './dto/create-content-item.dto';
 import { MetaPublishingService } from './meta-publishing.service';
 import { ScheduleContentDto } from './dto/schedule-content.dto';
-import {
-  formatLegacyPlatform,
-  normalizeSocialPlatforms,
-  SocialPlatform,
-} from './social-platform';
+import { formatLegacyPlatform, normalizeSocialPlatforms, SocialPlatform } from './social-platform';
 import { UpdateContentItemDto } from './dto/update-content-item.dto';
 
 type ContentItemRecord = typeof contentItems.$inferSelect;
@@ -38,8 +34,8 @@ export class ContentService {
     private readonly calendarService: CalendarService,
   ) {}
 
-  async create(input: CreateContentItemDto): Promise<ContentItemRecord> {
-    await this.ensureClientExists(input.clientId);
+  async create(input: CreateContentItemDto, organizationId: string): Promise<ContentItemRecord> {
+    await this.ensureClientExists(input.clientId, organizationId);
     await this.ensureCampaignBelongsToClient(input.campaignId, input.clientId);
     const socialTargets = this.normalizeSocialTargets(input.socialTargets);
     await this.ensureTargetsBelongToClient(input.clientId, socialTargets);
@@ -69,15 +65,23 @@ export class ContentService {
 
       return contentItem;
     } catch (error) {
-      throw new OperationError('Failed to create content item.', 'content.create', {
-        stage: 'insert-content-item',
-        clientId: input.clientId,
-        title: input.title,
-      }, error);
+      throw new OperationError(
+        'Failed to create content item.',
+        'content.create',
+        {
+          stage: 'insert-content-item',
+          clientId: input.clientId,
+          title: input.title,
+        },
+        error,
+      );
     }
   }
 
-  async findAll(filter: ContentQueryDto = {}): Promise<ContentItemRecord[]> {
+  async findAll(
+    filter: ContentQueryDto = {},
+    organizationId: string,
+  ): Promise<ContentItemRecord[]> {
     const conditions: SQL[] = [];
 
     if (filter.clientId) {
@@ -101,19 +105,28 @@ export class ContentService {
       conditions.push(ilike(contentItems.title, search));
     }
 
-    return this.db
-      .select()
+    const rows = await this.db
+      .select({ contentItem: contentItems })
       .from(contentItems)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .innerJoin(clients, eq(contentItems.clientId, clients.id))
+      .where(and(eq(clients.organizationId, organizationId), ...conditions))
       .orderBy(desc(contentItems.createdAt));
+
+    return rows.map((row) => row.contentItem);
   }
 
-  async findOne(id: string): Promise<ContentItemRecord> {
-    const [contentItem] = await this.db
-      .select()
+  async findOne(id: string, organizationId?: string): Promise<ContentItemRecord> {
+    const [row] = await this.db
+      .select({ contentItem: contentItems })
       .from(contentItems)
-      .where(eq(contentItems.id, id))
+      .innerJoin(clients, eq(contentItems.clientId, clients.id))
+      .where(
+        organizationId
+          ? and(eq(contentItems.id, id), eq(clients.organizationId, organizationId))
+          : eq(contentItems.id, id),
+      )
       .limit(1);
+    const contentItem = row?.contentItem;
 
     if (!contentItem) {
       throw new NotFoundException('Content item not found.');
@@ -122,12 +135,16 @@ export class ContentService {
     return contentItem;
   }
 
-  async update(id: string, input: UpdateContentItemDto): Promise<ContentItemRecord> {
-    const existingContentItem = await this.findOne(id);
+  async update(
+    id: string,
+    input: UpdateContentItemDto,
+    organizationId: string,
+  ): Promise<ContentItemRecord> {
+    const existingContentItem = await this.findOne(id, organizationId);
     const clientId = input.clientId ?? existingContentItem.clientId;
 
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     await this.ensureCampaignBelongsToClient(input.campaignId, clientId);
@@ -166,8 +183,12 @@ export class ContentService {
     return contentItem;
   }
 
-  async schedule(id: string, input: ScheduleContentDto): Promise<ContentItemRecord> {
-    const existingContentItem = await this.findOne(id);
+  async schedule(
+    id: string,
+    input: ScheduleContentDto,
+    organizationId: string,
+  ): Promise<ContentItemRecord> {
+    const existingContentItem = await this.findOne(id, organizationId);
 
     try {
       const [contentItem] = await this.db
@@ -213,10 +234,15 @@ export class ContentService {
 
       return contentItem;
     } catch (error) {
-      throw new OperationError('Failed to schedule content item.', 'content.schedule', {
-        stage: 'schedule-content-item',
-        contentItemId: id,
-      }, error);
+      throw new OperationError(
+        'Failed to schedule content item.',
+        'content.schedule',
+        {
+          stage: 'schedule-content-item',
+          contentItemId: id,
+        },
+        error,
+      );
     }
   }
 
@@ -269,8 +295,8 @@ export class ContentService {
       });
   }
 
-  async publish(id: string): Promise<ContentItemRecord> {
-    let contentItem = await this.findOne(id);
+  async publish(id: string, organizationId?: string): Promise<ContentItemRecord> {
+    let contentItem = await this.findOne(id, organizationId);
     const socialTargets = this.normalizeSocialTargets(contentItem.socialTargets);
     const platforms = this.getTargetPlatforms(socialTargets);
     let publishResults = contentItem.publishResults ?? {};
@@ -339,12 +365,7 @@ export class ContentService {
         throw error;
       }
 
-      contentItem = await this.savePublishResults(
-        id,
-        platforms,
-        socialTargets,
-        publishResults,
-      );
+      contentItem = await this.savePublishResults(id, platforms, socialTargets, publishResults);
     }
 
     [contentItem] = await this.db
@@ -438,11 +459,7 @@ export class ContentService {
     for (const target of targets) {
       const connection = byId.get(target.connectionId);
 
-      if (
-        target.platform === 'INSTAGRAM' &&
-        connection &&
-        !connection.instagramAccountId
-      ) {
+      if (target.platform === 'INSTAGRAM' && connection && !connection.instagramAccountId) {
         throw new HttpException(
           `${connection.facebookPageName} does not have a connected Instagram professional account.`,
           400,
@@ -478,15 +495,22 @@ export class ContentService {
     return error instanceof Error ? error.message : 'Unknown publishing error.';
   }
 
-  private async ensureClientExists(clientId: string): Promise<void> {
-    const [client] = await this.db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  private async ensureClientExists(clientId: string, organizationId: string): Promise<void> {
+    const [client] = await this.db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
+      .limit(1);
 
     if (!client) {
       throw new NotFoundException('Client not found.');
     }
   }
 
-  private async ensureCampaignBelongsToClient(campaignId: string | undefined, clientId: string): Promise<void> {
+  private async ensureCampaignBelongsToClient(
+    campaignId: string | undefined,
+    clientId: string,
+  ): Promise<void> {
     if (!campaignId) {
       return;
     }

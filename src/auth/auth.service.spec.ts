@@ -4,23 +4,30 @@ import { AuthService } from './auth.service';
 import { PublicUser, UsersService } from '../users/users.service';
 
 describe('AuthService.login', () => {
-  const buildService = (overrides: {
-    findByEmail?: jest.Mock;
-    signAsync?: jest.Mock;
-  } = {}) => {
+  const buildService = (
+    overrides: {
+      findByEmail?: jest.Mock;
+      signAsync?: jest.Mock;
+    } = {},
+  ) => {
     const usersService = {
       findByEmail: overrides.findByEmail ?? jest.fn(),
-      toPublicUser: jest.fn((user: { id: string; email: string; name: string; role: string; status: string }) => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        status: user.status,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }) as PublicUser),
+      toPublicUser: jest.fn(
+        (user: { id: string; email: string; name: string; role: string; status: string }) =>
+          ({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }) as PublicUser,
+      ),
     } as unknown as UsersService;
-    const jwtService = { signAsync: overrides.signAsync ?? jest.fn().mockResolvedValue('signed.jwt.token') };
+    const jwtService = {
+      signAsync: overrides.signAsync ?? jest.fn().mockResolvedValue('signed.jwt.token'),
+    };
     const config = { get: jest.fn().mockReturnValue('http://localhost:3000') };
     const notificationsService = { notifyUser: jest.fn() };
     const auditService = { log: jest.fn() };
@@ -59,9 +66,9 @@ describe('AuthService.login', () => {
   it('rejects an unknown email with a generic error', async () => {
     const service = buildService({ findByEmail: jest.fn().mockResolvedValue(undefined) });
 
-    await expect(service.login({ email: 'nobody@pxl.test', password: 'whatever' })).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(
+      service.login({ email: 'nobody@pxl.test', password: 'whatever' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects a wrong password with the same generic error', async () => {
@@ -77,8 +84,8 @@ describe('AuthService.login', () => {
       }),
     });
 
-    await expect(service.login({ email: 'admin@pxl.test', password: 'wrong-password' })).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(
+      service.login({ email: 'admin@pxl.test', password: 'wrong-password' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

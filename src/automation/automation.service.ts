@@ -59,7 +59,9 @@ export class AutomationService {
       pending: pending.length,
       succeeded: succeeded.length,
       lastFailureAt: lastFailure?.createdAt ?? null,
-      retryableFailures: failed.filter((log) => ['drive-folder-provisioned'].includes(log.eventName)).length,
+      retryableFailures: failed.filter((log) =>
+        ['drive-folder-provisioned'].includes(log.eventName),
+      ).length,
     };
   }
 

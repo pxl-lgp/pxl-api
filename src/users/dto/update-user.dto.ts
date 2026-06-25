@@ -14,9 +14,13 @@ export class UpdateUserDto {
   @MinLength(2)
   name?: string;
 
-  @ApiProperty({ enum: ['ADMIN', 'TEAM', 'CLIENT'], example: 'TEAM', required: false })
+  @ApiProperty({
+    enum: ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'],
+    example: 'TEAM',
+    required: false,
+  })
   @IsOptional()
-  @IsEnum(['ADMIN', 'TEAM', 'CLIENT'])
+  @IsEnum(['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'])
   role?: UserRole;
 
   @ApiProperty({ enum: ['ACTIVE', 'DISABLED'], example: 'ACTIVE', required: false })

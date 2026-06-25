@@ -1,6 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsOptional, IsString, IsUrl, IsUUID, Min, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateAssetDto {
   @ApiProperty({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })

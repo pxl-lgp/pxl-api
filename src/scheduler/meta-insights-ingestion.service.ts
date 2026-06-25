@@ -6,7 +6,12 @@ import { AutomationService } from '../automation/automation.service';
 import { AppConfig } from '../config/app.config';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { analytics, contentItems, socialConnections, SocialPublishResult } from '../database/schema';
+import {
+  analytics,
+  contentItems,
+  socialConnections,
+  SocialPublishResult,
+} from '../database/schema';
 import { TokenEncryptionService } from '../social-connections/token-encryption.service';
 
 // Serialises the ingestion sweep across API instances.
@@ -112,7 +117,9 @@ export class MetaInsightsIngestionService {
 
       const results = Object.values(item.publishResults ?? {}).filter(
         (result): result is SocialPublishResult =>
-          result?.status === 'SUCCEEDED' && Boolean(result.remoteId) && Boolean(result.connectionId),
+          result?.status === 'SUCCEEDED' &&
+          Boolean(result.remoteId) &&
+          Boolean(result.connectionId),
       );
 
       if (results.length === 0) {
@@ -209,7 +216,10 @@ export class MetaInsightsIngestionService {
     return map;
   }
 
-  private async fetchMetrics(result: SocialPublishResult, token: string): Promise<Partial<Metrics>> {
+  private async fetchMetrics(
+    result: SocialPublishResult,
+    token: string,
+  ): Promise<Partial<Metrics>> {
     if (result.platform === 'INSTAGRAM') {
       return this.fetchInstagramMetrics(result.remoteId as string, token);
     }

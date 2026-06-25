@@ -12,7 +12,7 @@ export class InviteUserDto {
   @MinLength(2)
   name!: string;
 
-  @ApiProperty({ enum: ['ADMIN', 'TEAM', 'CLIENT'], example: 'CLIENT' })
-  @IsEnum(['ADMIN', 'TEAM', 'CLIENT'])
+  @ApiProperty({ enum: ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'], example: 'CLIENT' })
+  @IsEnum(['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT'])
   role!: UserRole;
 }

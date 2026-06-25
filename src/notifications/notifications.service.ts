@@ -66,7 +66,10 @@ export class NotificationsService {
     source?: string | null;
     message?: string | null;
   }): Promise<void> {
-    const recipients = await this.settingsService.getRecipients('client-onboarding', this.teamEmail);
+    const recipients = await this.settingsService.getRecipients(
+      'client-onboarding',
+      this.teamEmail,
+    );
 
     if (!this.transporter || recipients.length === 0) {
       return;

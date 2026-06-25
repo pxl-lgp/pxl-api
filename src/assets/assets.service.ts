@@ -19,11 +19,11 @@ export class AssetsService {
     private readonly aiService: AiService,
   ) {}
 
-  async create(input: CreateAssetDto): Promise<AssetRecord> {
-    await this.ensureClientExists(input.clientId);
+  async create(input: CreateAssetDto, organizationId: string): Promise<AssetRecord> {
+    await this.ensureClientExists(input.clientId, organizationId);
 
     if (input.contentItemId) {
-      await this.ensureContentItemExists(input.contentItemId);
+      await this.ensureContentItemExists(input.contentItemId, organizationId);
     }
 
     try {
@@ -42,15 +42,20 @@ export class AssetsService {
 
       return asset;
     } catch (error) {
-      throw new OperationError('Failed to create asset.', 'assets.create', {
-        stage: 'insert-asset',
-        clientId: input.clientId,
-        name: input.name,
-      }, error);
+      throw new OperationError(
+        'Failed to create asset.',
+        'assets.create',
+        {
+          stage: 'insert-asset',
+          clientId: input.clientId,
+          name: input.name,
+        },
+        error,
+      );
     }
   }
 
-  async findAll(filter: AssetQueryDto = {}): Promise<AssetRecord[]> {
+  async findAll(filter: AssetQueryDto = {}, organizationId: string): Promise<AssetRecord[]> {
     const conditions: SQL[] = [];
 
     if (filter.clientId) {
@@ -70,15 +75,24 @@ export class AssetsService {
       conditions.push(ilike(assets.name, search));
     }
 
-    return this.db
-      .select()
+    const rows = await this.db
+      .select({ asset: assets })
       .from(assets)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .innerJoin(clients, eq(assets.clientId, clients.id))
+      .where(and(eq(clients.organizationId, organizationId), ...conditions))
       .orderBy(desc(assets.createdAt));
+
+    return rows.map((row) => row.asset);
   }
 
-  async findOne(id: string): Promise<AssetRecord> {
-    const [asset] = await this.db.select().from(assets).where(eq(assets.id, id)).limit(1);
+  async findOne(id: string, organizationId: string): Promise<AssetRecord> {
+    const [row] = await this.db
+      .select({ asset: assets })
+      .from(assets)
+      .innerJoin(clients, eq(assets.clientId, clients.id))
+      .where(and(eq(assets.id, id), eq(clients.organizationId, organizationId)))
+      .limit(1);
+    const asset = row?.asset;
 
     if (!asset) {
       throw new NotFoundException('Asset not found.');
@@ -87,15 +101,15 @@ export class AssetsService {
     return asset;
   }
 
-  async update(id: string, input: UpdateAssetDto): Promise<AssetRecord> {
-    await this.findOne(id);
+  async update(id: string, input: UpdateAssetDto, organizationId: string): Promise<AssetRecord> {
+    await this.findOne(id, organizationId);
 
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     if (input.contentItemId) {
-      await this.ensureContentItemExists(input.contentItemId);
+      await this.ensureContentItemExists(input.contentItemId, organizationId);
     }
 
     const [asset] = await this.db
@@ -115,8 +129,8 @@ export class AssetsService {
    * (Workflow Study §12: AI tagging + searchable archives). Falls back to a
    * deterministic draft when no AI provider is configured.
    */
-  async autoTag(id: string): Promise<AssetRecord> {
-    const asset = await this.findOne(id);
+  async autoTag(id: string, organizationId: string): Promise<AssetRecord> {
+    const asset = await this.findOne(id, organizationId);
     const result = await this.aiService.generateTags({
       clientName: asset.name,
       contentTitle: asset.name,
@@ -138,8 +152,12 @@ export class AssetsService {
     return updated;
   }
 
-  private async ensureClientExists(clientId: string) {
-    const [client] = await this.db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  private async ensureClientExists(clientId: string, organizationId: string) {
+    const [client] = await this.db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
+      .limit(1);
 
     if (!client) {
       throw new NotFoundException('Client not found.');
@@ -148,11 +166,12 @@ export class AssetsService {
     return client;
   }
 
-  private async ensureContentItemExists(contentItemId: string) {
+  private async ensureContentItemExists(contentItemId: string, organizationId: string) {
     const [contentItem] = await this.db
       .select({ id: contentItems.id })
       .from(contentItems)
-      .where(eq(contentItems.id, contentItemId))
+      .innerJoin(clients, eq(contentItems.clientId, clients.id))
+      .where(and(eq(contentItems.id, contentItemId), eq(clients.organizationId, organizationId)))
       .limit(1);
 
     if (!contentItem) {

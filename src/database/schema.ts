@@ -10,11 +10,23 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'TEAM', 'CLIENT']);
+export const userRoleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'TEAM', 'CLIENT']);
 export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'DISABLED']);
 export const authTokenPurposeEnum = pgEnum('auth_token_purpose', ['INVITE', 'PASSWORD_RESET']);
-export const clientStatusEnum = pgEnum('client_status', ['LEAD', 'ONBOARDING', 'ACTIVE', 'PAUSED', 'ARCHIVED']);
-export const leadStatusEnum = pgEnum('lead_status', ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST']);
+export const clientStatusEnum = pgEnum('client_status', [
+  'LEAD',
+  'ONBOARDING',
+  'ACTIVE',
+  'PAUSED',
+  'ARCHIVED',
+]);
+export const leadStatusEnum = pgEnum('lead_status', [
+  'NEW',
+  'CONTACTED',
+  'QUALIFIED',
+  'WON',
+  'LOST',
+]);
 export const contentStatusEnum = pgEnum('content_status', [
   'IDEA',
   'DRAFTING',
@@ -27,8 +39,17 @@ export const contentStatusEnum = pgEnum('content_status', [
   'PUBLISHED',
   'REPORTED',
 ]);
-export const approvalStatusEnum = pgEnum('approval_status', ['PENDING', 'APPROVED', 'REVISION_REQUESTED']);
-export const automationStatusEnum = pgEnum('automation_status', ['PENDING', 'SENT', 'SUCCEEDED', 'FAILED']);
+export const approvalStatusEnum = pgEnum('approval_status', [
+  'PENDING',
+  'APPROVED',
+  'REVISION_REQUESTED',
+]);
+export const automationStatusEnum = pgEnum('automation_status', [
+  'PENDING',
+  'SENT',
+  'SUCCEEDED',
+  'FAILED',
+]);
 export const socialConnectionStatusEnum = pgEnum('social_connection_status', [
   'CONNECTED',
   'EXPIRED',
@@ -40,7 +61,12 @@ export const onboardingTaskStatusEnum = pgEnum('onboarding_task_status', [
   'IN_PROGRESS',
   'DONE',
 ]);
-export const campaignStatusEnum = pgEnum('campaign_status', ['PLANNED', 'ACTIVE', 'PAUSED', 'COMPLETED']);
+export const campaignStatusEnum = pgEnum('campaign_status', [
+  'PLANNED',
+  'ACTIVE',
+  'PAUSED',
+  'COMPLETED',
+]);
 
 export type SocialPlatform = 'FACEBOOK_PAGE' | 'INSTAGRAM';
 
@@ -59,13 +85,41 @@ export type SocialPublishResult = {
   error?: string;
 };
 
+export const DEFAULT_ORGANIZATION_ID = '00000000-0000-0000-0000-000000000001';
+
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 };
 
+export const organizations = pgTable('organizations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  ...timestamps,
+});
+
+export const organizationFeatureAccess = pgTable(
+  'organization_feature_access',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    featureKey: text('feature_key').notNull(),
+    enabled: integer('enabled').default(1).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('organization_feature_access_unique').on(table.organizationId, table.featureKey),
+  ],
+);
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   name: text('name').notNull(),
@@ -76,7 +130,9 @@ export const users = pgTable('users', {
 
 export const authTokens = pgTable('auth_tokens', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
   tokenHash: text('token_hash').notNull().unique(),
   purpose: authTokenPurposeEnum('purpose').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -106,6 +162,9 @@ export const clients = pgTable(
   'clients',
   {
     id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
     businessName: text('business_name').notNull(),
     industry: text('industry'),
     contactPerson: text('contact_person'),
@@ -121,14 +180,19 @@ export const clients = pgTable(
   },
   // Client-portal users are linked to their workspace by email, so the email
   // must resolve to at most one client. (Postgres allows multiple NULL emails.)
-  (table) => [uniqueIndex('clients_email_unique').on(table.email)],
+  (table) => [
+    uniqueIndex('clients_organization_email_unique').on(table.organizationId, table.email),
+    index('clients_organization_idx').on(table.organizationId),
+  ],
 );
 
 export const metaAuthorizations = pgTable(
   'meta_authorizations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     metaUserId: text('meta_user_id').notNull(),
     metaUserName: text('meta_user_name'),
     accessTokenEncrypted: text('access_token_encrypted').notNull(),
@@ -148,7 +212,9 @@ export const socialConnections = pgTable(
   'social_connections',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     authorizationId: uuid('authorization_id')
       .references(() => metaAuthorizations.id, { onDelete: 'cascade' })
       .notNull(),
@@ -170,8 +236,12 @@ export const socialConnections = pgTable(
 export const metaOauthStates = pgTable('meta_oauth_states', {
   id: uuid('id').defaultRandom().primaryKey(),
   nonceHash: text('nonce_hash').notNull().unique(),
-  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
-  createdByUserId: uuid('created_by_user_id').references(() => users.id).notNull(),
+  clientId: uuid('client_id')
+    .references(() => clients.id, { onDelete: 'cascade' })
+    .notNull(),
+  createdByUserId: uuid('created_by_user_id')
+    .references(() => users.id)
+    .notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),
   ...timestamps,
@@ -179,6 +249,9 @@ export const metaOauthStates = pgTable('meta_oauth_states', {
 
 export const leads = pgTable('leads', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id')
+    .references(() => organizations.id, { onDelete: 'cascade' })
+    .notNull(),
   businessName: text('business_name').notNull(),
   contactPerson: text('contact_person'),
   email: text('email').notNull(),
@@ -200,7 +273,9 @@ export const campaigns = pgTable(
   'campaigns',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     name: text('name').notNull(),
     status: campaignStatusEnum('status').default('PLANNED').notNull(),
     goal: text('goal'),
@@ -219,7 +294,9 @@ export const contentItems = pgTable(
   'content_items',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id)
+      .notNull(),
     campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     contentType: text('content_type').notNull(),
@@ -250,8 +327,12 @@ export const contentItems = pgTable(
 
 export const approvals = pgTable('approvals', {
   id: uuid('id').defaultRandom().primaryKey(),
-  contentItemId: uuid('content_item_id').references(() => contentItems.id).notNull(),
-  clientId: uuid('client_id').references(() => clients.id).notNull(),
+  contentItemId: uuid('content_item_id')
+    .references(() => contentItems.id)
+    .notNull(),
+  clientId: uuid('client_id')
+    .references(() => clients.id)
+    .notNull(),
   status: approvalStatusEnum('status').default('PENDING').notNull(),
   feedback: text('feedback'),
   revisionCount: integer('revision_count').default(0).notNull(),
@@ -264,8 +345,12 @@ export const approvalComments = pgTable(
   'approval_comments',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    approvalId: uuid('approval_id').references(() => approvals.id, { onDelete: 'cascade' }).notNull(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    approvalId: uuid('approval_id')
+      .references(() => approvals.id, { onDelete: 'cascade' })
+      .notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
     authorName: text('author_name').notNull(),
     authorRole: userRoleEnum('author_role').notNull(),
@@ -277,7 +362,9 @@ export const approvalComments = pgTable(
 
 export const assets = pgTable('assets', {
   id: uuid('id').defaultRandom().primaryKey(),
-  clientId: uuid('client_id').references(() => clients.id).notNull(),
+  clientId: uuid('client_id')
+    .references(() => clients.id)
+    .notNull(),
   contentItemId: uuid('content_item_id').references(() => contentItems.id),
   name: text('name').notNull(),
   assetType: text('asset_type').notNull(),
@@ -289,7 +376,9 @@ export const assets = pgTable('assets', {
 
 export const analytics = pgTable('analytics', {
   id: uuid('id').defaultRandom().primaryKey(),
-  contentItemId: uuid('content_item_id').references(() => contentItems.id).notNull(),
+  contentItemId: uuid('content_item_id')
+    .references(() => contentItems.id)
+    .notNull(),
   reach: integer('reach').default(0).notNull(),
   impressions: integer('impressions').default(0).notNull(),
   engagement: integer('engagement').default(0).notNull(),
@@ -305,7 +394,9 @@ export const analytics = pgTable('analytics', {
 
 export const reports = pgTable('reports', {
   id: uuid('id').defaultRandom().primaryKey(),
-  clientId: uuid('client_id').references(() => clients.id).notNull(),
+  clientId: uuid('client_id')
+    .references(() => clients.id)
+    .notNull(),
   title: text('title').notNull(),
   periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
   periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
@@ -322,7 +413,9 @@ export const onboardingTasks = pgTable(
   'onboarding_tasks',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     title: text('title').notNull(),
     description: text('description'),
     status: onboardingTaskStatusEnum('status').default('PENDING').notNull(),
@@ -339,7 +432,9 @@ export const contentPillars = pgTable(
   'content_pillars',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    clientId: uuid('client_id')
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
     name: text('name').notNull(),
     description: text('description'),
     // Target number of posts per month for this pillar; drives monthly planning.

@@ -6,7 +6,15 @@ import { AiGenerationResponseDto } from './dto/ai-generation-response.dto';
 import { AnalyzePerformanceDto } from './dto/analyze-performance.dto';
 import { summarizePerformance } from './performance-insights';
 
-type AiTask = 'caption' | 'hashtags' | 'reel-script' | 'brief' | 'broll' | 'overlay' | 'tags' | 'template';
+type AiTask =
+  | 'caption'
+  | 'hashtags'
+  | 'reel-script'
+  | 'brief'
+  | 'broll'
+  | 'overlay'
+  | 'tags'
+  | 'template';
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -67,12 +75,18 @@ export class AiService {
       '(content creation, reels, graphics, scheduling, and reporting). Answer briefly and helpfully. ' +
       'If the visitor seems interested, invite them to share their business name, email, and what they need ' +
       'so the team can follow up. Never invent specific prices; say the team will send a tailored quote.';
-    const user = clientName ? `Visitor (${clientName}) asks: ${message}` : `Visitor asks: ${message}`;
+    const user = clientName
+      ? `Visitor (${clientName}) asks: ${message}`
+      : `Visitor asks: ${message}`;
 
-    return this.callModel(system, user, 0.5, () =>
-      "Thanks for reaching out to PXL Digital Marketing! We help businesses with social media content, " +
-      'reels, graphics, scheduling, and reporting. Share your business name, email, and what you need, ' +
-      'and our team will get back to you with a tailored proposal.',
+    return this.callModel(
+      system,
+      user,
+      0.5,
+      () =>
+        'Thanks for reaching out to PXL Digital Marketing! We help businesses with social media content, ' +
+        'reels, graphics, scheduling, and reporting. Share your business name, email, and what you need, ' +
+        'and our team will get back to you with a tailored proposal.',
     );
   }
 
@@ -135,11 +149,15 @@ export class AiService {
       caption: 'Draft 2 social caption options with a clear CTA. Keep each under 120 words.',
       hashtags: 'Suggest 12 hashtags. Return comma-separated hashtags only.',
       'reel-script': 'Draft a short-form reel script with hook, scene flow, overlay text, and CTA.',
-      brief: 'Draft a creative brief with objective, audience, message, asset notes, and review checklist.',
-      broll: 'Suggest 6-8 B-roll / supporting shot ideas for this reel. Return a numbered list, one shot per line.',
-      overlay: 'Write the on-screen overlay text (auto-caption lines) for each scene of this reel. Keep each line under 8 words.',
+      brief:
+        'Draft a creative brief with objective, audience, message, asset notes, and review checklist.',
+      broll:
+        'Suggest 6-8 B-roll / supporting shot ideas for this reel. Return a numbered list, one shot per line.',
+      overlay:
+        'Write the on-screen overlay text (auto-caption lines) for each scene of this reel. Keep each line under 8 words.',
       tags: 'Suggest 8-12 short asset-library tags (lowercase, no #). Return comma-separated tags only.',
-      template: 'Create a reusable content template with labelled sections (Hook, Body, Proof, CTA) that the team can refill for future posts.',
+      template:
+        'Create a reusable content template with labelled sections (Hook, Body, Proof, CTA) that the team can refill for future posts.',
     };
 
     const style = this.buildStyle(task, input);
@@ -177,7 +195,15 @@ export class AiService {
     const taglish = input.language === 'TAGLISH';
 
     if (task === 'hashtags') {
-      return ['brand', 'localbusiness', input.industry, input.contentType, platform, 'marketing', 'promo']
+      return [
+        'brand',
+        'localbusiness',
+        input.industry,
+        input.contentType,
+        platform,
+        'marketing',
+        'promo',
+      ]
         .filter(Boolean)
         .map((tag) => `#${String(tag).replace(/\s+/g, '').toLowerCase()}`)
         .join(', ');

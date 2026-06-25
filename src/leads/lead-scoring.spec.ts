@@ -27,7 +27,10 @@ describe('scoreLead', () => {
       email: 'ceo@bigbrand.com',
       phone: '+639171234567',
       source: 'referral',
-      message: 'budget monthly retainer package contract urgent asap ready hire quote proposal '.repeat(20),
+      message:
+        'budget monthly retainer package contract urgent asap ready hire quote proposal '.repeat(
+          20,
+        ),
     });
 
     expect(result.score).toBeLessThanOrEqual(100);

@@ -5,7 +5,14 @@ describe('summarizePerformance', () => {
     const output = summarizePerformance({
       clientName: 'Acme',
       contentTitle: 'June promo',
-      metrics: { reach: 1000, impressions: 2000, engagement: 80, clicks: 40, saves: 50, followersGained: 5 },
+      metrics: {
+        reach: 1000,
+        impressions: 2000,
+        engagement: 80,
+        clicks: 40,
+        saves: 50,
+        followersGained: 5,
+      },
     });
 
     expect(output).toContain('Engagement rate: 8.0%');

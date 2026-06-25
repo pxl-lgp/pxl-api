@@ -15,8 +15,8 @@ type CampaignRecord = typeof campaigns.$inferSelect;
 export class CampaignsService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  async create(input: CreateCampaignDto): Promise<CampaignRecord> {
-    await this.ensureClientExists(input.clientId);
+  async create(input: CreateCampaignDto, organizationId: string): Promise<CampaignRecord> {
+    await this.ensureClientExists(input.clientId, organizationId);
 
     try {
       const [campaign] = await this.db
@@ -37,14 +37,19 @@ export class CampaignsService {
 
       return campaign;
     } catch (error) {
-      throw new OperationError('Failed to create campaign.', 'campaigns.create', {
-        stage: 'insert-campaign',
-        clientId: input.clientId,
-      }, error);
+      throw new OperationError(
+        'Failed to create campaign.',
+        'campaigns.create',
+        {
+          stage: 'insert-campaign',
+          clientId: input.clientId,
+        },
+        error,
+      );
     }
   }
 
-  async findAll(filter: CampaignQueryDto = {}): Promise<CampaignRecord[]> {
+  async findAll(filter: CampaignQueryDto = {}, organizationId: string): Promise<CampaignRecord[]> {
     const conditions: SQL[] = [];
 
     if (filter.clientId) {
@@ -60,15 +65,24 @@ export class CampaignsService {
       conditions.push(ilike(campaigns.name, search));
     }
 
-    return this.db
-      .select()
+    const rows = await this.db
+      .select({ campaign: campaigns })
       .from(campaigns)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .innerJoin(clients, eq(campaigns.clientId, clients.id))
+      .where(and(eq(clients.organizationId, organizationId), ...conditions))
       .orderBy(desc(campaigns.createdAt));
+
+    return rows.map((row) => row.campaign);
   }
 
-  async findOne(id: string): Promise<CampaignRecord> {
-    const [campaign] = await this.db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+  async findOne(id: string, organizationId: string): Promise<CampaignRecord> {
+    const [row] = await this.db
+      .select({ campaign: campaigns })
+      .from(campaigns)
+      .innerJoin(clients, eq(campaigns.clientId, clients.id))
+      .where(and(eq(campaigns.id, id), eq(clients.organizationId, organizationId)))
+      .limit(1);
+    const campaign = row?.campaign;
 
     if (!campaign) {
       throw new NotFoundException('Campaign not found.');
@@ -77,11 +91,15 @@ export class CampaignsService {
     return campaign;
   }
 
-  async update(id: string, input: UpdateCampaignDto): Promise<CampaignRecord> {
-    await this.findOne(id);
+  async update(
+    id: string,
+    input: UpdateCampaignDto,
+    organizationId: string,
+  ): Promise<CampaignRecord> {
+    await this.findOne(id, organizationId);
 
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     const [campaign] = await this.db
@@ -93,15 +111,19 @@ export class CampaignsService {
     return campaign;
   }
 
-  async remove(id: string): Promise<{ deleted: true; id: string }> {
-    await this.findOne(id);
+  async remove(id: string, organizationId: string): Promise<{ deleted: true; id: string }> {
+    await this.findOne(id, organizationId);
     await this.db.delete(campaigns).where(eq(campaigns.id, id));
 
     return { deleted: true, id };
   }
 
-  private async ensureClientExists(clientId: string): Promise<void> {
-    const [client] = await this.db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  private async ensureClientExists(clientId: string, organizationId: string): Promise<void> {
+    const [client] = await this.db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
+      .limit(1);
 
     if (!client) {
       throw new NotFoundException('Client not found.');

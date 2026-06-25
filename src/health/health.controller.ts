@@ -1,5 +1,10 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';

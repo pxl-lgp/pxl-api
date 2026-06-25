@@ -55,7 +55,8 @@ export class AiGenerationDto {
   @ApiPropertyOptional({
     enum: ['EN', 'TAGLISH'],
     default: 'EN',
-    description: 'Output language. TAGLISH produces a natural Tagalog-English mix for a Filipino audience.',
+    description:
+      'Output language. TAGLISH produces a natural Tagalog-English mix for a Filipino audience.',
   })
   @IsOptional()
   @IsIn(['EN', 'TAGLISH'])
@@ -63,7 +64,8 @@ export class AiGenerationDto {
 
   @ApiPropertyOptional({
     default: false,
-    description: 'When true, optimize captions for social SEO (keyword-rich first line, relevant keywords woven in).',
+    description:
+      'When true, optimize captions for social SEO (keyword-rich first line, relevant keywords woven in).',
   })
   @IsOptional()
   @IsBoolean()

@@ -39,23 +39,32 @@ export class ContentTemplatesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a reusable content template' })
-  @ApiCreatedResponse({ description: 'Content template created.', type: ContentTemplateResponseDto })
+  @ApiCreatedResponse({
+    description: 'Content template created.',
+    type: ContentTemplateResponseDto,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can manage content templates.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can manage content templates.',
+  })
   @ApiNotFoundResponse({ description: 'Client not found.' })
   create(@Body() input: CreateContentTemplateDto): Promise<ContentTemplateResponseDto> {
     return this.contentTemplatesService.create(input);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List content templates (shared + a client\'s own when clientId is given)' })
+  @ApiOperation({
+    summary: "List content templates (shared + a client's own when clientId is given)",
+  })
   @ApiQuery({ name: 'clientId', required: false })
-  @ApiOkResponse({ description: 'Content templates.', type: ContentTemplateResponseDto, isArray: true })
+  @ApiOkResponse({
+    description: 'Content templates.',
+    type: ContentTemplateResponseDto,
+    isArray: true,
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view content templates.' })
-  findAvailable(
-    @Query('clientId') clientId?: string,
-  ): Promise<ContentTemplateResponseDto[]> {
+  findAvailable(@Query('clientId') clientId?: string): Promise<ContentTemplateResponseDto[]> {
     return this.contentTemplatesService.findAvailable(clientId);
   }
 
@@ -63,7 +72,9 @@ export class ContentTemplatesController {
   @ApiOperation({ summary: 'Update a content template' })
   @ApiOkResponse({ description: 'Content template updated.', type: ContentTemplateResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can manage content templates.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can manage content templates.',
+  })
   @ApiNotFoundResponse({ description: 'Content template or client not found.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -76,7 +87,9 @@ export class ContentTemplatesController {
   @ApiOperation({ summary: 'Delete a content template' })
   @ApiOkResponse({ description: 'Content template deleted.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
-  @ApiForbiddenResponse({ description: 'Only admins and team members can manage content templates.' })
+  @ApiForbiddenResponse({
+    description: 'Only admins and team members can manage content templates.',
+  })
   @ApiNotFoundResponse({ description: 'Content template not found.' })
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ deleted: true; id: string }> {
     return this.contentTemplatesService.remove(id);
