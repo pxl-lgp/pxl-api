@@ -33,6 +33,12 @@ export class PublicOnboardingDto {
   @MaxLength(320)
   email!: string;
 
+  @ApiProperty({ example: 'change-this-password', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  password!: string;
+
   @ApiPropertyOptional({ example: '+639171234567' })
   @IsOptional()
   @IsString()

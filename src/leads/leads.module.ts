@@ -3,11 +3,12 @@ import { AutomationModule } from '../automation/automation.module';
 import { ClientsModule } from '../clients/clients.module';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { WorkspaceModule } from '../workspace/workspace.module';
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
 
 @Module({
-  imports: [AutomationModule, ClientsModule, DatabaseModule, NotificationsModule],
+  imports: [AutomationModule, ClientsModule, DatabaseModule, NotificationsModule, WorkspaceModule],
   controllers: [LeadsController],
   providers: [LeadsService],
 })

@@ -4,7 +4,8 @@ import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { approvalComments, approvals, contentItems } from '../database/schema';
+import { approvalComments, approvals, clients, contentItems } from '../database/schema';
+import { WorkspaceService } from '../workspace/workspace.service';
 import { CreateApprovalCommentDto } from './dto/create-approval-comment.dto';
 import { CreateApprovalDto } from './dto/create-approval.dto';
 import { UpdateApprovalDto } from './dto/update-approval.dto';
@@ -14,7 +15,10 @@ type ApprovalCommentRecord = typeof approvalComments.$inferSelect;
 
 @Injectable()
 export class ApprovalsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   async create(input: CreateApprovalDto): Promise<ApprovalRecord> {
     const contentItem = await this.ensureContentItemExists(input.contentItemId);
@@ -81,7 +85,7 @@ export class ApprovalsService {
         ? existingApproval.revisionCount + 1
         : existingApproval.revisionCount;
 
-    return this.db.transaction(async (tx) => {
+    const updatedApproval = await this.db.transaction(async (tx) => {
       const [approval] = await tx
         .update(approvals)
         .set({
@@ -104,6 +108,27 @@ export class ApprovalsService {
 
       return approval;
     });
+
+    const [client] = await this.db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, updatedApproval.clientId))
+      .limit(1);
+    if (client) {
+      void this.workspaceService.postActivity({
+        organizationId: client.organizationId,
+        event: `approval-${updatedApproval.status.toLowerCase()}`,
+        body: `Approval ${updatedApproval.status === 'APPROVED' ? 'approved' : 'needs revision'}.`,
+        href: '/admin/approvals',
+        metadata: {
+          approvalId: updatedApproval.id,
+          clientId: updatedApproval.clientId,
+          contentItemId: updatedApproval.contentItemId,
+        },
+      });
+    }
+
+    return updatedApproval;
   }
 
   async findComments(approvalId: string): Promise<ApprovalCommentRecord[]> {

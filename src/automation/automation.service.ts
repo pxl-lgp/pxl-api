@@ -2,7 +2,8 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { automationLogs } from '../database/schema';
+import { automationLogs, clients, contentItems, leads, reports } from '../database/schema';
+import { WorkspaceService } from '../workspace/workspace.service';
 
 type AutomationLog = typeof automationLogs.$inferSelect;
 type AutomationStatus = AutomationLog['status'];
@@ -11,7 +12,10 @@ type AutomationStatus = AutomationLog['status'];
 export class AutomationService {
   private readonly logger = new Logger(AutomationService.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   async logEvent(input: {
     eventName: string;
@@ -35,7 +39,78 @@ export class AutomationService {
       })
       .returning();
 
+    if (log.status === 'FAILED') {
+      void this.postFailureActivity(log);
+    }
+
     return log;
+  }
+
+  private async postFailureActivity(log: AutomationLog): Promise<void> {
+    const organizationId = await this.resolveOrganizationId(log.entityType, log.entityId);
+    if (!organizationId) return;
+
+    await this.workspaceService.postActivity({
+      organizationId,
+      event: 'automation-failed',
+      body: `Automation failed: ${log.eventName}`,
+      href: '/admin/automation',
+      metadata: { automationLogId: log.id, entityType: log.entityType, entityId: log.entityId },
+    });
+  }
+
+  private async resolveOrganizationId(
+    entityType: string,
+    entityId: string | null,
+  ): Promise<string | null> {
+    if (!entityId) return null;
+
+    if (entityType === 'client') {
+      const [client] = await this.db
+        .select({ organizationId: clients.organizationId })
+        .from(clients)
+        .where(eq(clients.id, entityId))
+        .limit(1);
+      return client?.organizationId ?? null;
+    }
+    if (entityType === 'lead') {
+      const [lead] = await this.db
+        .select({ organizationId: leads.organizationId })
+        .from(leads)
+        .where(eq(leads.id, entityId))
+        .limit(1);
+      return lead?.organizationId ?? null;
+    }
+    if (entityType === 'content') {
+      const [content] = await this.db
+        .select({ clientId: contentItems.clientId })
+        .from(contentItems)
+        .where(eq(contentItems.id, entityId))
+        .limit(1);
+      if (!content) return null;
+      const [client] = await this.db
+        .select({ organizationId: clients.organizationId })
+        .from(clients)
+        .where(eq(clients.id, content.clientId))
+        .limit(1);
+      return client?.organizationId ?? null;
+    }
+    if (entityType === 'report') {
+      const [report] = await this.db
+        .select({ clientId: reports.clientId })
+        .from(reports)
+        .where(eq(reports.id, entityId))
+        .limit(1);
+      if (!report) return null;
+      const [client] = await this.db
+        .select({ organizationId: clients.organizationId })
+        .from(clients)
+        .where(eq(clients.id, report.clientId))
+        .limit(1);
+      return client?.organizationId ?? null;
+    }
+
+    return null;
   }
 
   async findAll(status?: AutomationStatus): Promise<AutomationLog[]> {

@@ -17,6 +17,7 @@ import {
 } from '../database/schema';
 import { CreateContentItemDto } from './dto/create-content-item.dto';
 import { MetaPublishingService } from './meta-publishing.service';
+import { WorkspaceService } from '../workspace/workspace.service';
 import { ScheduleContentDto } from './dto/schedule-content.dto';
 import { formatLegacyPlatform, normalizeSocialPlatforms, SocialPlatform } from './social-platform';
 import { UpdateContentItemDto } from './dto/update-content-item.dto';
@@ -32,6 +33,7 @@ export class ContentService {
     private readonly automationService: AutomationService,
     private readonly metaPublishingService: MetaPublishingService,
     private readonly calendarService: CalendarService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   async create(input: CreateContentItemDto, organizationId: string): Promise<ContentItemRecord> {
@@ -231,6 +233,7 @@ export class ContentService {
       // the old n8n content-scheduled flow. Skipped silently when no calendar is
       // configured; never blocks or fails the schedule request.
       this.createScheduleReminder(contentItem);
+      void this.postContentScheduledActivity(contentItem);
 
       return contentItem;
     } catch (error) {
@@ -293,6 +296,24 @@ export class ContentService {
           errorMessage: message,
         });
       });
+  }
+
+  private async postContentScheduledActivity(contentItem: ContentItemRecord): Promise<void> {
+    const [client] = await this.db
+      .select({ organizationId: clients.organizationId })
+      .from(clients)
+      .where(eq(clients.id, contentItem.clientId))
+      .limit(1);
+
+    if (!client) return;
+
+    await this.workspaceService.postActivity({
+      organizationId: client.organizationId,
+      event: 'content-scheduled',
+      body: `Content scheduled: ${contentItem.title}`,
+      href: `/admin/content/${contentItem.id}`,
+      metadata: { contentItemId: contentItem.id, clientId: contentItem.clientId },
+    });
   }
 
   async publish(id: string, organizationId?: string): Promise<ContentItemRecord> {

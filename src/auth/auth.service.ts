@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -14,7 +15,7 @@ import { AuditService } from '../audit/audit.service';
 import { AppConfig } from '../config/app.config';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { authTokens } from '../database/schema';
+import { authTokens, clients } from '../database/schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -52,17 +53,27 @@ export class AuthService {
       throw new ForbiddenException('Only super admins can create super admins.');
     }
 
+    if (input.role === 'CLIENT') {
+      await this.requireLinkableClient(input.email, actorUser.organizationId);
+    }
+
     const passwordHash = await hash(input.password, PASSWORD_SALT_ROUNDS);
 
     // Admins create accounts on behalf of others; they should not receive a
     // session token for the new user. The new user logs in themselves.
-    return this.usersService.create({
+    const user = await this.usersService.create({
       email: input.email,
       organizationId: actorUser.organizationId,
       passwordHash,
       name: input.name,
       role: input.role,
     });
+
+    if (user.role === 'CLIENT') {
+      await this.linkClientUser(user.id, user.email, user.organizationId);
+    }
+
+    return user;
   }
 
   async login(input: LoginDto): Promise<AuthResponseDto> {
@@ -94,6 +105,10 @@ export class AuthService {
       throw new ForbiddenException('Only super admins can invite super admins.');
     }
 
+    if (input.role === 'CLIENT') {
+      await this.requireLinkableClient(input.email, actorUser.organizationId);
+    }
+
     const passwordHash = await hash(randomBytes(32).toString('hex'), PASSWORD_SALT_ROUNDS);
     const user = await this.usersService.create({
       email: input.email,
@@ -104,6 +119,10 @@ export class AuthService {
       status: 'ACTIVE',
     });
     const link = await this.createAuthLink(user.id, 'INVITE');
+
+    if (user.role === 'CLIENT') {
+      await this.linkClientUser(user.id, user.email, user.organizationId);
+    }
 
     await this.notificationsService.notifyUser(
       user.email,
@@ -245,6 +264,39 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async linkClientUser(userId: string, email: string, organizationId: string): Promise<void> {
+    const client = await this.requireLinkableClient(email, organizationId, userId);
+
+    await this.db
+      .update(clients)
+      .set({ userId, updatedAt: new Date() })
+      .where(eq(clients.id, client.id));
+  }
+
+  private async requireLinkableClient(
+    email: string,
+    organizationId: string,
+    userId?: string,
+  ): Promise<{ id: string; userId: string | null }> {
+    const [client] = await this.db
+      .select({ id: clients.id, userId: clients.userId })
+      .from(clients)
+      .where(and(eq(clients.organizationId, organizationId), eq(clients.email, email.toLowerCase())))
+      .limit(1);
+
+    if (!client) {
+      throw new BadRequestException(
+        'Client users must be linked to a client profile. Create the client from Clients and enable the portal account option.',
+      );
+    }
+
+    if (client.userId && client.userId !== userId) {
+      throw new ConflictException('This client profile is already linked to another user.');
+    }
+
+    return client;
   }
 
   private async signAccessToken(user: {

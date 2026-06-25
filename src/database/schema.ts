@@ -67,6 +67,27 @@ export const campaignStatusEnum = pgEnum('campaign_status', [
   'PAUSED',
   'COMPLETED',
 ]);
+export const workspaceChannelTypeEnum = pgEnum('workspace_channel_type', [
+  'GENERAL',
+  'CLIENT',
+  'PROJECT',
+  'SYSTEM',
+]);
+export const workspaceVisibilityEnum = pgEnum('workspace_visibility', ['PUBLIC', 'PRIVATE']);
+export const workspaceMemberRoleEnum = pgEnum('workspace_member_role', ['OWNER', 'MEMBER']);
+export const workspaceTaskStatusEnum = pgEnum('workspace_task_status', [
+  'TODO',
+  'IN_PROGRESS',
+  'REVIEW',
+  'DONE',
+  'BLOCKED',
+]);
+export const workspaceTaskPriorityEnum = pgEnum('workspace_task_priority', [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'URGENT',
+]);
 
 export type SocialPlatform = 'FACEBOOK_PAGE' | 'INSTAGRAM';
 
@@ -165,6 +186,7 @@ export const clients = pgTable(
     organizationId: uuid('organization_id')
       .references(() => organizations.id, { onDelete: 'cascade' })
       .notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     businessName: text('business_name').notNull(),
     industry: text('industry'),
     contactPerson: text('contact_person'),
@@ -178,10 +200,9 @@ export const clients = pgTable(
     driveFolderUrl: text('drive_folder_url'),
     ...timestamps,
   },
-  // Client-portal users are linked to their workspace by email, so the email
-  // must resolve to at most one client. (Postgres allows multiple NULL emails.)
   (table) => [
     uniqueIndex('clients_organization_email_unique').on(table.organizationId, table.email),
+    uniqueIndex('clients_user_id_unique').on(table.userId),
     index('clients_organization_idx').on(table.organizationId),
   ],
 );
@@ -456,6 +477,172 @@ export const contentTemplates = pgTable('content_templates', {
   body: text('body').notNull(),
   ...timestamps,
 });
+
+export const workspaceChannels = pgTable(
+  'workspace_channels',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    type: workspaceChannelTypeEnum('type').default('GENERAL').notNull(),
+    visibility: workspaceVisibilityEnum('visibility').default('PUBLIC').notNull(),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('workspace_channels_organization_slug_unique').on(table.organizationId, table.slug),
+    index('workspace_channels_organization_idx').on(table.organizationId),
+    index('workspace_channels_client_idx').on(table.clientId),
+  ],
+);
+
+export const workspaceChannelMembers = pgTable(
+  'workspace_channel_members',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    channelId: uuid('channel_id')
+      .references(() => workspaceChannels.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    role: workspaceMemberRoleEnum('role').default('MEMBER').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('workspace_channel_members_channel_user_unique').on(table.channelId, table.userId),
+    index('workspace_channel_members_channel_idx').on(table.channelId),
+  ],
+);
+
+export const workspaceMessages = pgTable(
+  'workspace_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    channelId: uuid('channel_id')
+      .references(() => workspaceChannels.id, { onDelete: 'cascade' })
+      .notNull(),
+    authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('workspace_messages_channel_idx').on(table.channelId),
+    index('workspace_messages_organization_idx').on(table.organizationId),
+  ],
+);
+
+export const workspaceBoards = pgTable(
+  'workspace_boards',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('workspace_boards_organization_slug_unique').on(table.organizationId, table.slug),
+    index('workspace_boards_organization_idx').on(table.organizationId),
+  ],
+);
+
+export const workspaceTasks = pgTable(
+  'workspace_tasks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    boardId: uuid('board_id').references(() => workspaceBoards.id, { onDelete: 'set null' }),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    contentItemId: uuid('content_item_id').references(() => contentItems.id, {
+      onDelete: 'set null',
+    }),
+    leadId: uuid('lead_id').references(() => leads.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    status: workspaceTaskStatusEnum('status').default('TODO').notNull(),
+    priority: workspaceTaskPriorityEnum('priority').default('MEDIUM').notNull(),
+    assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+    reporterUserId: uuid('reporter_user_id').references(() => users.id, { onDelete: 'set null' }),
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    position: integer('position').default(0).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('workspace_tasks_organization_idx').on(table.organizationId),
+    index('workspace_tasks_board_idx').on(table.boardId),
+    index('workspace_tasks_assignee_idx').on(table.assigneeUserId),
+  ],
+);
+
+export const workspaceTaskComments = pgTable(
+  'workspace_task_comments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    taskId: uuid('task_id')
+      .references(() => workspaceTasks.id, { onDelete: 'cascade' })
+      .notNull(),
+    authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('workspace_task_comments_task_idx').on(table.taskId)],
+);
+
+export const workspacePages = pgTable(
+  'workspace_pages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .notNull(),
+    parentPageId: uuid('parent_page_id'),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    icon: text('icon'),
+    content: jsonb('content')
+      .$type<{ format: 'markdown'; text: string }>()
+      .default({ format: 'markdown', text: '' })
+      .notNull(),
+    visibility: workspaceVisibilityEnum('visibility').default('PUBLIC').notNull(),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedByUserId: uuid('updated_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('workspace_pages_organization_slug_unique').on(table.organizationId, table.slug),
+    index('workspace_pages_organization_idx').on(table.organizationId),
+  ],
+);
 
 export const automationLogs = pgTable('automation_logs', {
   id: uuid('id').defaultRandom().primaryKey(),

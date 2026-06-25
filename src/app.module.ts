@@ -37,6 +37,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { SettingsModule } from './settings/settings.module';
 import { SocialConnectionsModule } from './social-connections/social-connections.module';
 import { UsersModule } from './users/users.module';
+import { WorkspaceModule } from './workspace/workspace.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { UsersModule } from './users/users.module';
     SocialConnectionsModule,
     NotificationsModule,
     HealthModule,
+    WorkspaceModule,
   ],
   providers: [
     {

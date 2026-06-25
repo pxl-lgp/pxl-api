@@ -3,10 +3,14 @@ import { desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { organizations } from '../database/schema';
+import { WorkspaceService } from '../workspace/workspace.service';
 
 @Injectable()
 export class OrganizationsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   async create(input: { name: string; slug: string }) {
     const slug = input.slug.trim().toLowerCase();
@@ -24,6 +28,8 @@ export class OrganizationsService {
       .insert(organizations)
       .values({ name: input.name.trim(), slug })
       .returning();
+
+    await this.workspaceService.ensureDefaultsForOrganization(organization.id);
 
     return organization;
   }

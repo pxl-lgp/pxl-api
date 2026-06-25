@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsObject,
@@ -78,4 +79,18 @@ export class CreateClientDto {
   @IsOptional()
   @IsUrl({ require_tld: false })
   driveFolderUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Create a CLIENT portal user and link it to this client.',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  createPortalUser?: boolean;
+
+  @ApiPropertyOptional({ example: 'change-this-password', minLength: 8 })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  portalPassword?: string;
 }

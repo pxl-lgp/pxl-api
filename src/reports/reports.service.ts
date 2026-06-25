@@ -5,6 +5,7 @@ import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { clients, reports } from '../database/schema';
+import { WorkspaceService } from '../workspace/workspace.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 
@@ -15,6 +16,7 @@ export class ReportsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly notificationsService: NotificationsService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   async create(input: CreateReportDto, organizationId: string): Promise<ReportRecord> {
@@ -118,6 +120,16 @@ export class ReportsService {
         `New report: ${report.title}`,
         `Your latest PXL report is ready.${report.driveUrl ? `\n\nOpen it here: ${report.driveUrl}` : ''}`,
       );
+    }
+
+    if (client) {
+      void this.workspaceService.postActivity({
+        organizationId: client.organizationId,
+        event: 'report-sent',
+        body: `Report sent: ${report.title}`,
+        href: '/admin/reports',
+        metadata: { reportId: report.id, clientId: report.clientId },
+      });
     }
 
     return updated;

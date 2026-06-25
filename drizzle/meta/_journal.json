@@ -106,6 +106,27 @@
       "when": 1782148000000,
       "tag": "0014_super_admin_feature_access",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1782149000000,
+      "tag": "0015_workspace_os",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782150000000,
+      "tag": "0016_workspace_task_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782151000000,
+      "tag": "0017_client_user_links",
+      "breakpoints": true
     }
   ]
 }

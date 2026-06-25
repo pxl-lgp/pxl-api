@@ -42,6 +42,11 @@ export const featureDefinitions = [
     label: 'Settings',
     description: 'Notification, permissions, and account administration.',
   },
+  {
+    key: 'workspace',
+    label: 'Workspace',
+    description: 'Channels, tasks, docs, and team collaboration.',
+  },
 ] as const;
 
 export type FeatureKey = (typeof featureDefinitions)[number]['key'];

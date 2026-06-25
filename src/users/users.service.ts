@@ -1,9 +1,9 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { and, desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
-import { users } from '../database/schema';
+import { clients, users } from '../database/schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const PASSWORD_SALT_ROUNDS = 12;
@@ -81,7 +81,7 @@ export class UsersService {
   }
 
   async update(id: string, input: UpdateUserDto, organizationId?: string): Promise<PublicUser> {
-    await this.requireUser(id, organizationId);
+    const currentUser = await this.requireUser(id, organizationId);
 
     const email = input.email?.trim().toLowerCase();
 
@@ -94,6 +94,25 @@ export class UsersService {
 
       if (existingUser && existingUser.id !== id) {
         throw new ConflictException('A user with this email already exists.');
+      }
+    }
+
+    if (input.role === 'CLIENT') {
+      const clientEmail = email ?? currentUser.email;
+      const [linkedClient] = await this.db
+        .select({ id: clients.id, userId: clients.userId })
+        .from(clients)
+        .where(and(eq(clients.organizationId, currentUser.organizationId), eq(clients.email, clientEmail)))
+        .limit(1);
+
+      if (!linkedClient) {
+        throw new BadRequestException(
+          'Client users must be linked to a client profile. Create the client from Clients and enable the portal account option.',
+        );
+      }
+
+      if (linkedClient.userId && linkedClient.userId !== id) {
+        throw new ConflictException('This client profile is already linked to another user.');
       }
     }
 
@@ -112,6 +131,23 @@ export class UsersService {
       })
       .where(eq(users.id, id))
       .returning();
+
+    if (updatedUser.role === 'CLIENT') {
+      await this.db
+        .update(clients)
+        .set({ userId: updatedUser.id, updatedAt: new Date() })
+        .where(
+          and(
+            eq(clients.organizationId, updatedUser.organizationId),
+            eq(clients.email, updatedUser.email),
+          ),
+        );
+    } else if (currentUser.role === 'CLIENT') {
+      await this.db
+        .update(clients)
+        .set({ userId: null, updatedAt: new Date() })
+        .where(eq(clients.userId, updatedUser.id));
+    }
 
     return this.toPublicUser(updatedUser);
   }

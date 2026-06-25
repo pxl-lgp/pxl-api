@@ -44,10 +44,22 @@ export class ClientPortalService {
       throw new ForbiddenException('Only client users can access the client portal.');
     }
 
+    const [linkedClient] = await this.db
+      .select()
+      .from(clients)
+      .where(and(eq(clients.userId, user.id), eq(clients.organizationId, user.organizationId)))
+      .limit(1);
+
+    if (linkedClient) {
+      return linkedClient;
+    }
+
     const matchingClients = await this.db
       .select()
       .from(clients)
-      .where(eq(clients.email, user.email.toLowerCase()))
+      .where(
+        and(eq(clients.email, user.email.toLowerCase()), eq(clients.organizationId, user.organizationId)),
+      )
       .limit(2);
 
     if (matchingClients.length === 0) {

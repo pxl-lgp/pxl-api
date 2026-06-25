@@ -6,6 +6,7 @@ import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WorkspaceService } from '../workspace/workspace.service';
 import { clients, DEFAULT_ORGANIZATION_ID, leads } from '../database/schema';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { scoreLead } from './lead-scoring';
@@ -22,6 +23,7 @@ export class LeadsService {
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly clientsService: ClientsService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   async create(
@@ -99,6 +101,14 @@ export class LeadsService {
           `Failed to log lead-created event: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
+
+    void this.workspaceService.postActivity({
+      organizationId: lead.organizationId,
+      event: 'lead-created',
+      body: `New lead received: ${lead.businessName}`,
+      href: '/admin/leads',
+      metadata: { leadId: lead.id },
+    });
 
     return lead;
   }
@@ -191,6 +201,13 @@ export class LeadsService {
     // folder, onboarding notification, client-created log) so converted leads are
     // not treated as second-class clients.
     this.clientsService.runClientCreatedAutomation(client, { sourceLeadId: lead.id });
+    void this.workspaceService.postActivity({
+      organizationId: lead.organizationId,
+      event: 'lead-converted',
+      body: `Lead converted to client: ${lead.businessName}`,
+      href: `/admin/clients/${client.id}`,
+      metadata: { leadId: lead.id, clientId: client.id },
+    });
 
     return updatedLead;
   }

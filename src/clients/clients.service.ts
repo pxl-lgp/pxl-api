@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -7,6 +9,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { hash } from 'bcryptjs';
 import { and, desc, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation/automation.service';
 import { AppConfig } from '../config/app.config';
@@ -16,11 +19,13 @@ import { Database } from '../database/database.types';
 import { DriveService } from '../drive/drive.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OnboardingTasksService } from '../onboarding-tasks/onboarding-tasks.service';
-import { clients, DEFAULT_ORGANIZATION_ID } from '../database/schema';
+import { WorkspaceService } from '../workspace/workspace.service';
+import { clients, DEFAULT_ORGANIZATION_ID, users } from '../database/schema';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 type ClientRecord = typeof clients.$inferSelect;
+const PASSWORD_SALT_ROUNDS = 12;
 
 @Injectable()
 export class ClientsService {
@@ -32,6 +37,7 @@ export class ClientsService {
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingTasksService: OnboardingTasksService,
+    private readonly workspaceService: WorkspaceService,
     @Inject(forwardRef(() => DriveService))
     @Optional()
     private readonly driveService: DriveService | null,
@@ -41,6 +47,18 @@ export class ClientsService {
     input: CreateClientDto,
     organizationId = DEFAULT_ORGANIZATION_ID,
   ): Promise<ClientRecord> {
+    if (input.createPortalUser) {
+      if (!input.email) {
+        throw new BadRequestException('Email is required to create a client portal user.');
+      }
+
+      if (!input.portalPassword) {
+        throw new BadRequestException('Password is required to create a client portal user.');
+      }
+
+      return this.createWithPortalUser(input, organizationId, input.portalPassword);
+    }
+
     let client: ClientRecord;
 
     try {
@@ -48,6 +66,7 @@ export class ClientsService {
         .insert(clients)
         .values({
           organizationId,
+          userId: undefined,
           businessName: input.businessName,
           industry: input.industry,
           contactPerson: input.contactPerson,
@@ -74,6 +93,101 @@ export class ClientsService {
     }
 
     this.runClientCreatedAutomation(client);
+    void this.workspaceService.postActivity({
+      organizationId: client.organizationId,
+      event: 'client-created',
+      body: `Client created: ${client.businessName}`,
+      href: `/admin/clients/${client.id}`,
+      metadata: { clientId: client.id },
+    });
+
+    return client;
+  }
+
+  async createWithPortalUser(
+    input: Omit<CreateClientDto, 'createPortalUser' | 'portalPassword'>,
+    organizationId = DEFAULT_ORGANIZATION_ID,
+    password: string,
+  ): Promise<ClientRecord> {
+    const email = input.email?.trim().toLowerCase();
+
+    if (!email) {
+      throw new BadRequestException('Email is required to create a client portal user.');
+    }
+
+    const passwordHash = await hash(password, PASSWORD_SALT_ROUNDS);
+    let client: ClientRecord;
+
+    try {
+      client = await this.db.transaction(async (tx) => {
+        const [existingUser] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (existingUser) {
+          throw new ConflictException('A user with this email already exists.');
+        }
+
+        const [user] = await tx
+          .insert(users)
+          .values({
+            organizationId,
+            email,
+            passwordHash,
+            name: input.contactPerson?.trim() || input.businessName,
+            role: 'CLIENT',
+            status: 'ACTIVE',
+          })
+          .returning();
+
+        const [createdClient] = await tx
+          .insert(clients)
+          .values({
+            organizationId,
+            userId: user.id,
+            businessName: input.businessName,
+            industry: input.industry,
+            contactPerson: input.contactPerson,
+            email,
+            phone: input.phone,
+            socialLinks: input.socialLinks ?? {},
+            goals: input.goals,
+            brandNotes: input.brandNotes,
+            servicesNeeded: input.servicesNeeded ?? [],
+            status: input.status ?? 'ONBOARDING',
+            driveFolderUrl: input.driveFolderUrl,
+          })
+          .returning();
+
+        return createdClient;
+      });
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      throw new OperationError(
+        'Failed to create linked client portal account.',
+        'clients.createWithPortalUser',
+        {
+          stage: 'insert-client-user',
+          businessName: input.businessName,
+          email,
+        },
+        error,
+      );
+    }
+
+    this.runClientCreatedAutomation(client, { userId: client.userId });
+    void this.workspaceService.postActivity({
+      organizationId: client.organizationId,
+      event: 'client-created',
+      body: `Client created: ${client.businessName}`,
+      href: `/admin/clients/${client.id}`,
+      metadata: { clientId: client.id, userId: client.userId },
+    });
 
     return client;
   }
