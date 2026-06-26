@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { and, desc, eq } from 'drizzle-orm';
+import { AuditService } from '../audit/audit.service';
 import { AutomationService } from '../automation/automation.service';
 import { AppConfig } from '../config/app.config';
 import { OperationError } from '../common/errors/operation-error';
@@ -20,11 +22,15 @@ import { DriveService } from '../drive/drive.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OnboardingTasksService } from '../onboarding-tasks/onboarding-tasks.service';
 import { WorkspaceService } from '../workspace/workspace.service';
-import { clients, DEFAULT_ORGANIZATION_ID, users } from '../database/schema';
+import { authTokens, clients, DEFAULT_ORGANIZATION_ID, users } from '../database/schema';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 type ClientRecord = typeof clients.$inferSelect;
+type ClientWithPortalUser = ClientRecord & {
+  portalUserEmail: string | null;
+  portalUserStatus: 'ACTIVE' | 'DISABLED' | null;
+};
 const PASSWORD_SALT_ROUNDS = 12;
 
 @Injectable()
@@ -34,6 +40,7 @@ export class ClientsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly auditService: AuditService,
     private readonly automationService: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingTasksService: OnboardingTasksService,
@@ -46,7 +53,7 @@ export class ClientsService {
   async create(
     input: CreateClientDto,
     organizationId = DEFAULT_ORGANIZATION_ID,
-  ): Promise<ClientRecord> {
+  ): Promise<ClientWithPortalUser> {
     if (input.createPortalUser) {
       if (!input.email) {
         throw new BadRequestException('Email is required to create a client portal user.');
@@ -101,14 +108,14 @@ export class ClientsService {
       metadata: { clientId: client.id },
     });
 
-    return client;
+    return this.findOne(client.id, organizationId);
   }
 
   async createWithPortalUser(
     input: Omit<CreateClientDto, 'createPortalUser' | 'portalPassword'>,
     organizationId = DEFAULT_ORGANIZATION_ID,
     password: string,
-  ): Promise<ClientRecord> {
+  ): Promise<ClientWithPortalUser> {
     const email = input.email?.trim().toLowerCase();
 
     if (!email) {
@@ -120,6 +127,16 @@ export class ClientsService {
 
     try {
       client = await this.db.transaction(async (tx) => {
+        const [existingClient] = await tx
+          .select({ id: clients.id })
+          .from(clients)
+          .where(and(eq(clients.organizationId, organizationId), eq(clients.email, email)))
+          .limit(1);
+
+        if (existingClient) {
+          throw new ConflictException('A client profile with this email already exists.');
+        }
+
         const [existingUser] = await tx
           .select({ id: users.id })
           .from(users)
@@ -181,6 +198,12 @@ export class ClientsService {
     }
 
     this.runClientCreatedAutomation(client, { userId: client.userId });
+    void this.auditService.log({
+      action: 'client.portal_user_created',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email, userId: client.userId },
+    });
     void this.workspaceService.postActivity({
       organizationId: client.organizationId,
       event: 'client-created',
@@ -189,7 +212,209 @@ export class ClientsService {
       metadata: { clientId: client.id, userId: client.userId },
     });
 
+    return this.findOne(client.id, organizationId);
+  }
+
+  async createWithPortalInvite(
+    input: Omit<CreateClientDto, 'createPortalUser' | 'portalPassword'>,
+    organizationId = DEFAULT_ORGANIZATION_ID,
+  ): Promise<ClientWithPortalUser> {
+    const client = await this.createWithPortalUser(
+      input,
+      organizationId,
+      randomBytes(32).toString('hex'),
+    );
+
+    if (!client.userId || !client.email) {
+      return client;
+    }
+
+    const link = await this.createAuthLink(client.userId, 'INVITE');
+    await this.notificationsService.notifyUser(
+      client.email,
+      'Set up your PXL client portal',
+      `Thanks for completing onboarding. Set your PXL client portal password here:\n\n${link}\n\nThis link expires in 7 days.`,
+    );
+    await this.auditService.log({
+      action: 'client.self_onboarding_invite_sent',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email: client.email, userId: client.userId },
+    });
+
     return client;
+  }
+
+  async createPortalUser(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<ClientWithPortalUser> {
+    const client = await this.findOne(id, organizationId);
+
+    if (client.userId) {
+      throw new ConflictException('This client already has a linked portal user.');
+    }
+
+    if (!client.email) {
+      throw new BadRequestException('Client email is required to create a portal user.');
+    }
+
+    const email = client.email.toLowerCase();
+    const passwordHash = await hash(randomBytes(32).toString('hex'), PASSWORD_SALT_ROUNDS);
+    const user = await this.db.transaction(async (tx) => {
+      const [existingUser] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (existingUser) {
+        if (existingUser.organizationId !== organizationId || existingUser.role !== 'CLIENT') {
+          throw new ConflictException('A non-client user with this email already exists.');
+        }
+
+        const [linkedClient] = await tx
+          .select({ id: clients.id })
+          .from(clients)
+          .where(eq(clients.userId, existingUser.id))
+          .limit(1);
+
+        if (linkedClient && linkedClient.id !== client.id) {
+          throw new ConflictException('This user is already linked to another client profile.');
+        }
+
+        await tx
+          .update(clients)
+          .set({ userId: existingUser.id, updatedAt: new Date() })
+          .where(eq(clients.id, client.id));
+
+        return existingUser;
+      }
+
+      const [createdUser] = await tx
+        .insert(users)
+        .values({
+          organizationId,
+          email,
+          passwordHash,
+          name: client.contactPerson?.trim() || client.businessName,
+          role: 'CLIENT',
+          status: 'ACTIVE',
+        })
+        .returning();
+
+      await tx
+        .update(clients)
+        .set({ userId: createdUser.id, updatedAt: new Date() })
+        .where(eq(clients.id, client.id));
+
+      return createdUser;
+    });
+
+    const link = await this.createAuthLink(user.id, 'INVITE');
+    await this.notificationsService.notifyUser(
+      user.email,
+      'Your PXL client portal invite',
+      `Your PXL client portal is ready. Set your password here:\n\n${link}\n\nThis link expires in 7 days.`,
+    );
+    await this.auditService.log({
+      actorUserId,
+      action: 'client.portal_user_invited',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email: user.email, userId: user.id },
+    });
+
+    return this.findOne(id, organizationId);
+  }
+
+  async sendPortalUserPasswordReset(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    const client = await this.findOne(id, organizationId);
+
+    if (!client.userId) {
+      throw new NotFoundException('This client does not have a linked portal user.');
+    }
+
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, client.userId), eq(users.organizationId, organizationId)))
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundException('Linked portal user not found.');
+    }
+
+    const link = await this.createAuthLink(user.id, 'PASSWORD_RESET');
+    await this.notificationsService.notifyUser(
+      user.email,
+      'Reset your PXL client portal password',
+      `Reset your PXL client portal password here:\n\n${link}\n\nThis link expires in 1 hour.`,
+    );
+    await this.auditService.log({
+      actorUserId,
+      action: 'client.portal_user_password_reset_sent',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email: user.email, userId: user.id },
+    });
+  }
+
+  async disablePortalUser(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<ClientWithPortalUser> {
+    const client = await this.findOne(id, organizationId);
+
+    if (!client.userId) {
+      throw new NotFoundException('This client does not have a linked portal user.');
+    }
+
+    await this.db
+      .update(users)
+      .set({ status: 'DISABLED', updatedAt: new Date() })
+      .where(and(eq(users.id, client.userId), eq(users.organizationId, organizationId)));
+    await this.auditService.log({
+      actorUserId,
+      action: 'client.portal_user_disabled',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email: client.portalUserEmail, userId: client.userId },
+    });
+
+    return this.findOne(id, organizationId);
+  }
+
+  async unlinkPortalUser(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<ClientWithPortalUser> {
+    const client = await this.findOne(id, organizationId);
+
+    if (!client.userId) {
+      return client;
+    }
+
+    await this.db
+      .update(clients)
+      .set({ userId: null, updatedAt: new Date() })
+      .where(and(eq(clients.id, id), eq(clients.organizationId, organizationId)));
+    await this.auditService.log({
+      actorUserId,
+      action: 'client.portal_user_unlinked',
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email: client.portalUserEmail, userId: client.userId },
+    });
+
+    return this.findOne(id, organizationId);
   }
 
   /**
@@ -245,18 +470,26 @@ export class ClientsService {
       });
   }
 
-  async findAll(organizationId: string): Promise<ClientRecord[]> {
-    return this.db
-      .select()
+  async findAll(organizationId: string): Promise<ClientWithPortalUser[]> {
+    const records = await this.db
+      .select({ client: clients, portalUserEmail: users.email, portalUserStatus: users.status })
       .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
       .where(eq(clients.organizationId, organizationId))
       .orderBy(desc(clients.createdAt));
+
+    return records.map((record) => ({
+      ...record.client,
+      portalUserEmail: record.portalUserEmail,
+      portalUserStatus: record.portalUserStatus,
+    }));
   }
 
-  async findOne(id: string, organizationId?: string): Promise<ClientRecord> {
-    const [client] = await this.db
-      .select()
+  async findOne(id: string, organizationId?: string): Promise<ClientWithPortalUser> {
+    const [record] = await this.db
+      .select({ client: clients, portalUserEmail: users.email, portalUserStatus: users.status })
       .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
       .where(
         organizationId
           ? and(eq(clients.id, id), eq(clients.organizationId, organizationId))
@@ -264,17 +497,25 @@ export class ClientsService {
       )
       .limit(1);
 
-    if (!client) {
+    if (!record) {
       throw new NotFoundException('Client not found.');
     }
 
-    return client;
+    return {
+      ...record.client,
+      portalUserEmail: record.portalUserEmail,
+      portalUserStatus: record.portalUserStatus,
+    };
   }
 
-  async update(id: string, input: UpdateClientDto, organizationId: string): Promise<ClientRecord> {
-    await this.findOne(id, organizationId);
+  async update(id: string, input: UpdateClientDto, organizationId: string): Promise<ClientWithPortalUser> {
+    const existingClient = await this.findOne(id, organizationId);
 
-    const [client] = await this.db
+    if (input.email && existingClient.userId && input.email.toLowerCase() !== existingClient.email) {
+      throw new BadRequestException('Unlink or update the portal user before changing this client email.');
+    }
+
+    await this.db
       .update(clients)
       .set({
         ...input,
@@ -284,7 +525,24 @@ export class ClientsService {
       .where(and(eq(clients.id, id), eq(clients.organizationId, organizationId)))
       .returning();
 
-    return client;
+    return this.findOne(id, organizationId);
+  }
+
+  private async createAuthLink(
+    userId: string,
+    purpose: 'INVITE' | 'PASSWORD_RESET',
+  ): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + (purpose === 'INVITE' ? 7 * 24 * 60 : 60) * 60 * 1000);
+
+    await this.db.insert(authTokens).values({
+      userId,
+      tokenHash: createHash('sha256').update(token).digest('hex'),
+      purpose,
+      expiresAt,
+    });
+
+    return `${this.config.get('FRONTEND_URL', { infer: true })}/reset-password?token=${token}`;
   }
 
   async updateDriveFolder(id: string, driveFolderUrl: string): Promise<ClientRecord> {

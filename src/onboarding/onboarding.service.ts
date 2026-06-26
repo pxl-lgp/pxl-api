@@ -8,16 +8,13 @@ export class OnboardingService {
   constructor(private readonly clientsService: ClientsService) {}
 
   submit(input: PublicOnboardingDto): Promise<ClientResponseDto> {
-    const { password, ...clientInput } = input;
-
-    return this.clientsService.createWithPortalUser(
+    return this.clientsService.createWithPortalInvite(
       {
-        ...clientInput,
+        ...input,
         email: input.email.toLowerCase(),
         status: 'ONBOARDING',
       },
       undefined,
-      password,
     );
   }
 }

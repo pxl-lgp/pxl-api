@@ -10,6 +10,12 @@ export class ClientResponseDto {
   @ApiPropertyOptional({ example: '6b4b8b91-f27d-46ab-850c-a5d32970188b' })
   userId!: string | null;
 
+  @ApiPropertyOptional({ example: 'client@example.com' })
+  portalUserEmail!: string | null;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'DISABLED'], example: 'ACTIVE' })
+  portalUserStatus!: 'ACTIVE' | 'DISABLED' | null;
+
   @ApiProperty({ example: 'PXL Sample Restaurant' })
   businessName!: string;
 

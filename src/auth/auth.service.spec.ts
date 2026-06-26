@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PublicUser, UsersService } from '../users/users.service';
@@ -8,9 +8,12 @@ describe('AuthService.login', () => {
     overrides: {
       findByEmail?: jest.Mock;
       signAsync?: jest.Mock;
+      create?: jest.Mock;
+      db?: unknown;
     } = {},
   ) => {
     const usersService = {
+      create: overrides.create ?? jest.fn(),
       findByEmail: overrides.findByEmail ?? jest.fn(),
       toPublicUser: jest.fn(
         (user: { id: string; email: string; name: string; role: string; status: string }) =>
@@ -31,7 +34,7 @@ describe('AuthService.login', () => {
     const config = { get: jest.fn().mockReturnValue('http://localhost:3000') };
     const notificationsService = { notifyUser: jest.fn() };
     const auditService = { log: jest.fn() };
-    const db = {};
+    const db = overrides.db ?? {};
 
     return new AuthService(
       jwtService as never,
@@ -87,5 +90,29 @@ describe('AuthService.login', () => {
     await expect(
       service.login({ email: 'admin@pxl.test', password: 'wrong-password' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects client registration without a matching client profile', async () => {
+    const usersCreate = jest.fn();
+    const db = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+    };
+    const service = buildService({ create: usersCreate, db });
+
+    await expect(
+      service.register(
+        {
+          email: 'client@pxl.test',
+          name: 'Client',
+          password: 'change-this-password',
+          role: 'CLIENT',
+        },
+        { role: 'ADMIN', organizationId: 'org-1' },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(usersCreate).not.toHaveBeenCalled();
   });
 });

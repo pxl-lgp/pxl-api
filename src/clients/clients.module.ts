@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AutomationModule } from '../automation/automation.module';
 import { DatabaseModule } from '../database/database.module';
 import { DriveModule } from '../drive/drive.module';
@@ -11,6 +12,7 @@ import { ClientsService } from './clients.service';
 @Module({
   imports: [
     DatabaseModule,
+    AuditModule,
     AutomationModule,
     forwardRef(() => DriveModule),
     NotificationsModule,

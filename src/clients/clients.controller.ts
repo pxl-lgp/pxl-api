@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -88,5 +89,51 @@ export class ClientsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ClientResponseDto> {
     return this.clientsService.update(id, input, user.organizationId);
+  }
+
+  @Post(':id/portal-user')
+  @ApiOperation({ summary: 'Create or link a client portal user and send an invite' })
+  @ApiOkResponse({ description: 'Client portal user linked.', type: ClientResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
+  @ApiForbiddenResponse({ description: 'Only admins and team members can create portal users.' })
+  @ApiNotFoundResponse({ description: 'Client not found.' })
+  createPortalUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ClientResponseDto> {
+    return this.clientsService.createPortalUser(id, user.organizationId, user.id);
+  }
+
+  @Post(':id/portal-user/password-reset')
+  @ApiOperation({ summary: 'Send password reset email to a linked client portal user' })
+  @ApiOkResponse({ description: 'Password reset email sent.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
+  @ApiForbiddenResponse({ description: 'Only admins and team members can reset portal users.' })
+  @ApiNotFoundResponse({ description: 'Client or linked user not found.' })
+  async sendPortalUserPasswordReset(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<void> {
+    await this.clientsService.sendPortalUserPasswordReset(id, user.organizationId, user.id);
+  }
+
+  @Post(':id/portal-user/disable')
+  @ApiOperation({ summary: 'Disable a linked client portal user' })
+  @ApiOkResponse({ description: 'Client portal user disabled.', type: ClientResponseDto })
+  disablePortalUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ClientResponseDto> {
+    return this.clientsService.disablePortalUser(id, user.organizationId, user.id);
+  }
+
+  @Delete(':id/portal-user')
+  @ApiOperation({ summary: 'Unlink a client portal user from a client profile' })
+  @ApiOkResponse({ description: 'Client portal user unlinked.', type: ClientResponseDto })
+  unlinkPortalUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ClientResponseDto> {
+    return this.clientsService.unlinkPortalUser(id, user.organizationId, user.id);
   }
 }

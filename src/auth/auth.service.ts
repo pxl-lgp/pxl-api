@@ -70,7 +70,7 @@ export class AuthService {
     });
 
     if (user.role === 'CLIENT') {
-      await this.linkClientUser(user.id, user.email, user.organizationId);
+      await this.linkClientUser(user.id, user.email, user.organizationId, undefined, 'auth.client_user_registered');
     }
 
     return user;
@@ -121,7 +121,7 @@ export class AuthService {
     const link = await this.createAuthLink(user.id, 'INVITE');
 
     if (user.role === 'CLIENT') {
-      await this.linkClientUser(user.id, user.email, user.organizationId);
+      await this.linkClientUser(user.id, user.email, user.organizationId, actorUser.id, 'auth.client_user_invited');
     }
 
     await this.notificationsService.notifyUser(
@@ -266,13 +266,26 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private async linkClientUser(userId: string, email: string, organizationId: string): Promise<void> {
+  private async linkClientUser(
+    userId: string,
+    email: string,
+    organizationId: string,
+    actorUserId?: string,
+    action = 'auth.client_user_linked',
+  ): Promise<void> {
     const client = await this.requireLinkableClient(email, organizationId, userId);
 
     await this.db
       .update(clients)
       .set({ userId, updatedAt: new Date() })
       .where(eq(clients.id, client.id));
+    await this.auditService.log({
+      actorUserId,
+      action,
+      entityType: 'client',
+      entityId: client.id,
+      metadata: { email, userId },
+    });
   }
 
   private async requireLinkableClient(
