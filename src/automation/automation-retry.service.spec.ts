@@ -8,6 +8,7 @@ describe('AutomationRetryService.retry', () => {
   const build = (log: Record<string, unknown>) => {
     const automationService = {
       findOne: jest.fn().mockResolvedValue(log),
+      markSucceeded: jest.fn().mockResolvedValue(undefined),
     } as unknown as AutomationService;
     const retryDriveProvisioning = jest.fn().mockResolvedValue(undefined);
     const retryCalendarReminder = jest.fn().mockResolvedValue(undefined);

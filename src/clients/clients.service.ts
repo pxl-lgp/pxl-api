@@ -566,10 +566,21 @@ export class ClientsService {
    */
   async retryDriveProvisioning(clientId: string): Promise<void> {
     const client = await this.findOne(clientId);
+
+    if (client.driveFolderUrl) {
+      return;
+    }
+
     await this.provisionDriveFolder(client);
   }
 
   private async provisionDriveFolder(client: ClientRecord): Promise<void> {
+    const latestClient = await this.findOne(client.id);
+
+    if (latestClient.driveFolderUrl) {
+      return;
+    }
+
     // Accept either env name: the legacy DRIVE_CLIENTS_PARENT_FOLDER_ID takes
     // precedence, otherwise fall back to GOOGLE_DRIVE_CLIENTS_PARENT_FOLDER_ID
     // (which defaults to 'root' = My Drive). This avoids a silent no-op when only

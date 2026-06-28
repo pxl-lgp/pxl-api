@@ -153,4 +153,16 @@ export class AutomationService {
 
     return log;
   }
+
+  async markSucceeded(id: string, response: Record<string, unknown> = {}): Promise<void> {
+    await this.db
+      .update(automationLogs)
+      .set({
+        status: 'SUCCEEDED',
+        response,
+        errorMessage: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(automationLogs.id, id));
+  }
 }

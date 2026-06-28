@@ -46,6 +46,8 @@ export class AutomationRetryService {
         );
     }
 
+    await this.automationService.markSucceeded(log.id, { retriedAt: new Date().toISOString() });
+
     return { retried: true, eventName: log.eventName, entityId: log.entityId };
   }
 }
