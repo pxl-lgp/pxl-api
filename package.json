@@ -45,7 +45,7 @@
     "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "pg": "^8.16.0",
+    "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
@@ -64,15 +64,15 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.15.4",
     "drizzle-kit": "^0.31.1",
-    "eslint": "^10.5.0",
+    "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.5",
     "globals": "^15.15.0",
     "jest": "^30.4.2",
-    "prettier": "^3.8.4",
+    "prettier": "^3.9.3",
     "ts-jest": "^29.4.11",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.61.0"
+    "typescript-eslint": "^8.62.0"
   },
   "overrides": {
     "multer": "2.2.0",
