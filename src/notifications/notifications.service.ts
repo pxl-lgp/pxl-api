@@ -66,9 +66,9 @@ export class NotificationsService {
     source?: string | null;
     message?: string | null;
   }): Promise<void> {
-    const recipients = await this.settingsService.getRecipients(
-      'client-onboarding',
-      this.teamEmail,
+    const configuredRecipients = await this.settingsService.getRecipients('new-lead', this.teamEmail);
+    const recipients = Array.from(
+      new Set([...configuredRecipients, ...(this.teamEmail ? [this.teamEmail] : [])]),
     );
 
     if (!this.transporter || recipients.length === 0) {
