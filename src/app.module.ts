@@ -43,7 +43,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env.production', '.env.local', '.env'],
       validate: validateConfig,
     }),
     ScheduleModule.forRoot(),
