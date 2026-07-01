@@ -57,6 +57,17 @@ export class CreateWorkspaceBoardDto {
   clientId?: string;
 }
 
+export class UpdateWorkspaceBoardDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
 export class CreateWorkspaceTaskDto {
   @IsString()
   @MinLength(2)

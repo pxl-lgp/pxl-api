@@ -21,6 +21,7 @@ import {
   CreateWorkspacePageDto,
   CreateWorkspaceTaskCommentDto,
   CreateWorkspaceTaskDto,
+  UpdateWorkspaceBoardDto,
   UpdateWorkspaceChannelDto,
   UpdateWorkspacePageDto,
   UpdateWorkspaceTaskDto,
@@ -97,6 +98,8 @@ export class WorkspaceService {
   }
 
   async listChannels(user: AuthenticatedUser) {
+    await this.ensureDefaultsForOrganization(user.organizationId);
+
     if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
       return this.db
         .select()
@@ -213,7 +216,27 @@ export class WorkspaceService {
     return { ...message, authorName: user.name, authorRole: user.role };
   }
 
+  async deleteMessage(user: AuthenticatedUser, id: string) {
+    const [message] = await this.db
+      .select()
+      .from(workspaceMessages)
+      .where(and(eq(workspaceMessages.id, id), eq(workspaceMessages.organizationId, user.organizationId)))
+      .limit(1);
+    if (!message) throw new NotFoundException('Message not found.');
+
+    await this.requireChannelAccess(user, message.channelId, true);
+    await this.db.delete(workspaceMessages).where(eq(workspaceMessages.id, id));
+    return { deleted: true, id };
+  }
+
   async listBoards(user: AuthenticatedUser) {
+    await this.ensureBoardDefault({
+      organizationId: user.organizationId,
+      name: 'Team Tasks',
+      slug: 'team-tasks',
+      description: 'Default board for internal tasks.',
+    });
+
     return this.db
       .select()
       .from(workspaceBoards)
@@ -235,6 +258,24 @@ export class WorkspaceService {
       })
       .returning();
     return board;
+  }
+
+  async updateBoard(user: AuthenticatedUser, id: string, input: UpdateWorkspaceBoardDto) {
+    await this.requireBoard(user, id);
+    const [board] = await this.db
+      .update(workspaceBoards)
+      .set({ ...input, name: input.name?.trim(), updatedAt: new Date() })
+      .where(and(eq(workspaceBoards.id, id), eq(workspaceBoards.organizationId, user.organizationId)))
+      .returning();
+    return board;
+  }
+
+  async deleteBoard(user: AuthenticatedUser, id: string) {
+    await this.requireBoard(user, id);
+    await this.db
+      .delete(workspaceBoards)
+      .where(and(eq(workspaceBoards.id, id), eq(workspaceBoards.organizationId, user.organizationId)));
+    return { deleted: true, id };
   }
 
   async listTasks(user: AuthenticatedUser) {
@@ -284,6 +325,14 @@ export class WorkspaceService {
     return task;
   }
 
+  async deleteTask(user: AuthenticatedUser, id: string) {
+    await this.requireTask(user, id);
+    await this.db
+      .delete(workspaceTasks)
+      .where(and(eq(workspaceTasks.id, id), eq(workspaceTasks.organizationId, user.organizationId)));
+    return { deleted: true, id };
+  }
+
   async listTaskComments(user: AuthenticatedUser, taskId: string) {
     await this.requireTask(user, taskId);
     const rows = await this.db
@@ -330,12 +379,39 @@ export class WorkspaceService {
     return { ...comment, authorName: user.name, authorRole: user.role };
   }
 
+  async deleteTaskComment(user: AuthenticatedUser, id: string) {
+    const [comment] = await this.db
+      .select()
+      .from(workspaceTaskComments)
+      .where(
+        and(eq(workspaceTaskComments.id, id), eq(workspaceTaskComments.organizationId, user.organizationId)),
+      )
+      .limit(1);
+    if (!comment) throw new NotFoundException('Comment not found.');
+
+    await this.requireTask(user, comment.taskId);
+    await this.db.delete(workspaceTaskComments).where(eq(workspaceTaskComments.id, id));
+    return { deleted: true, id };
+  }
+
   async listPages(user: AuthenticatedUser) {
-    return this.db
+    await this.ensurePageDefault({
+      organizationId: user.organizationId,
+      title: 'Team Notes',
+      slug: 'team-notes',
+      text: '# Team Notes\n\nUse this page for shared notes, SOPs, and working agreements.',
+    });
+
+    const pages = await this.db
       .select()
       .from(workspacePages)
       .where(eq(workspacePages.organizationId, user.organizationId))
       .orderBy(desc(workspacePages.updatedAt));
+
+    return pages.map((page) => ({
+      ...page,
+      content: page.content ?? { format: 'markdown' as const, text: '' },
+    }));
   }
 
   async createPage(user: AuthenticatedUser, input: CreateWorkspacePageDto) {
@@ -352,7 +428,7 @@ export class WorkspaceService {
         updatedByUserId: user.id,
       })
       .returning();
-    return page;
+    return { ...page, content: page.content ?? { format: 'markdown' as const, text: '' } };
   }
 
   async updatePage(user: AuthenticatedUser, id: string, input: UpdateWorkspacePageDto) {
@@ -368,6 +444,14 @@ export class WorkspaceService {
       .where(and(eq(workspacePages.id, id), eq(workspacePages.organizationId, user.organizationId)))
       .returning();
     return page;
+  }
+
+  async deletePage(user: AuthenticatedUser, id: string) {
+    await this.requirePage(user, id);
+    await this.db
+      .delete(workspacePages)
+      .where(and(eq(workspacePages.id, id), eq(workspacePages.organizationId, user.organizationId)));
+    return { deleted: true, id };
   }
 
   private async requireChannelAccess(
@@ -412,6 +496,16 @@ export class WorkspaceService {
       .limit(1);
     if (!task) throw new NotFoundException('Task not found.');
     return task;
+  }
+
+  private async requireBoard(user: AuthenticatedUser, id: string) {
+    const [board] = await this.db
+      .select()
+      .from(workspaceBoards)
+      .where(and(eq(workspaceBoards.id, id), eq(workspaceBoards.organizationId, user.organizationId)))
+      .limit(1);
+    if (!board) throw new NotFoundException('Board not found.');
+    return board;
   }
 
   private async requirePage(user: AuthenticatedUser, id: string) {
@@ -490,9 +584,23 @@ export class WorkspaceService {
         type: input.type,
         visibility: 'PUBLIC',
       })
+      .onConflictDoNothing()
       .returning();
 
-    return channel;
+    if (channel) return channel;
+
+    const [createdByConcurrentRequest] = await this.db
+      .select()
+      .from(workspaceChannels)
+      .where(
+        and(
+          eq(workspaceChannels.organizationId, input.organizationId),
+          eq(workspaceChannels.slug, input.slug),
+        ),
+      )
+      .limit(1);
+
+    return createdByConcurrentRequest;
   }
 
   private async ensureBoardDefault(input: {
@@ -514,7 +622,7 @@ export class WorkspaceService {
 
     if (existing) return;
 
-    await this.db.insert(workspaceBoards).values(input);
+    await this.db.insert(workspaceBoards).values(input).onConflictDoNothing();
   }
 
   private async ensurePageDefault(input: {
@@ -536,13 +644,16 @@ export class WorkspaceService {
 
     if (existing) return;
 
-    await this.db.insert(workspacePages).values({
-      organizationId: input.organizationId,
-      title: input.title,
-      slug: input.slug,
-      content: { format: 'markdown', text: input.text },
-      visibility: 'PUBLIC',
-    });
+    await this.db
+      .insert(workspacePages)
+      .values({
+        organizationId: input.organizationId,
+        title: input.title,
+        slug: input.slug,
+        content: { format: 'markdown', text: input.text },
+        visibility: 'PUBLIC',
+      })
+      .onConflictDoNothing();
   }
 
   private async ensureSystemMessage(channelId: string, organizationId: string, body: string) {

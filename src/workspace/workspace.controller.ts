@@ -24,6 +24,7 @@ import {
   CreateWorkspacePageDto,
   CreateWorkspaceTaskCommentDto,
   CreateWorkspaceTaskDto,
+  UpdateWorkspaceBoardDto,
   UpdateWorkspaceChannelDto,
   UpdateWorkspacePageDto,
   UpdateWorkspaceTaskDto,
@@ -77,6 +78,11 @@ export class WorkspaceController {
     return this.workspaceService.createMessage(user, id, input);
   }
 
+  @Delete('messages/:id')
+  deleteMessage(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.workspaceService.deleteMessage(user, id);
+  }
+
   @Get('boards')
   listBoards(@CurrentUser() user: AuthenticatedUser) {
     return this.workspaceService.listBoards(user);
@@ -85,6 +91,20 @@ export class WorkspaceController {
   @Post('boards')
   createBoard(@CurrentUser() user: AuthenticatedUser, @Body() input: CreateWorkspaceBoardDto) {
     return this.workspaceService.createBoard(user, input);
+  }
+
+  @Patch('boards/:id')
+  updateBoard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: UpdateWorkspaceBoardDto,
+  ) {
+    return this.workspaceService.updateBoard(user, id, input);
+  }
+
+  @Delete('boards/:id')
+  deleteBoard(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.workspaceService.deleteBoard(user, id);
   }
 
   @Get('tasks')
@@ -106,6 +126,11 @@ export class WorkspaceController {
     return this.workspaceService.updateTask(user, id, input);
   }
 
+  @Delete('tasks/:id')
+  deleteTask(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.workspaceService.deleteTask(user, id);
+  }
+
   @Get('tasks/:id/comments')
   listTaskComments(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.workspaceService.listTaskComments(user, id);
@@ -118,6 +143,11 @@ export class WorkspaceController {
     @Body() input: CreateWorkspaceTaskCommentDto,
   ) {
     return this.workspaceService.createTaskComment(user, id, input);
+  }
+
+  @Delete('task-comments/:id')
+  deleteTaskComment(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.workspaceService.deleteTaskComment(user, id);
   }
 
   @Get('pages')
@@ -137,5 +167,10 @@ export class WorkspaceController {
     @Body() input: UpdateWorkspacePageDto,
   ) {
     return this.workspaceService.updatePage(user, id, input);
+  }
+
+  @Delete('pages/:id')
+  deletePage(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.workspaceService.deletePage(user, id);
   }
 }
