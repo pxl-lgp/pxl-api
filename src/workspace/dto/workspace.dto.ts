@@ -20,6 +20,11 @@ export class CreateWorkspaceChannelDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workflowStatuses?: string[];
 }
 
 export class UpdateWorkspaceChannelDto {
@@ -55,6 +60,11 @@ export class CreateWorkspaceBoardDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workflowStatuses?: string[];
 }
 
 export class UpdateWorkspaceBoardDto {
@@ -109,6 +119,10 @@ export class UpdateWorkspaceTaskDto {
   @IsString()
   @MinLength(2)
   title?: string;
+
+  @IsOptional()
+  @IsUUID()
+  boardId?: string | null;
 
   @IsOptional()
   @IsString()

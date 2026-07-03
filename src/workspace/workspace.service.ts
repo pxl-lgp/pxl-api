@@ -246,6 +246,9 @@ export class WorkspaceService {
 
   async createBoard(user: AuthenticatedUser, input: CreateWorkspaceBoardDto) {
     await this.ensureClient(input.clientId, user.organizationId);
+    const workflowStatuses = input.workflowStatuses
+      ?.map((status) => status.trim())
+      .filter((status, index, statuses) => status.length >= 2 && statuses.indexOf(status) === index);
     const [board] = await this.db
       .insert(workspaceBoards)
       .values({
@@ -254,6 +257,7 @@ export class WorkspaceService {
         name: input.name.trim(),
         slug: await this.uniqueSlug('board', user.organizationId, input.name),
         description: input.description,
+        workflowStatuses,
         createdByUserId: user.id,
       })
       .returning();
@@ -311,6 +315,7 @@ export class WorkspaceService {
 
   async updateTask(user: AuthenticatedUser, id: string, input: UpdateWorkspaceTaskDto) {
     const existingTask = await this.requireTask(user, id);
+    if (input.boardId) await this.ensureBoard(input.boardId, user.organizationId);
     const [task] = await this.db
       .update(workspaceTasks)
       .set({ ...input, title: input.title?.trim(), status: input.status?.trim(), updatedAt: new Date() })
