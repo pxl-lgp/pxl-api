@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateWorkspaceChannelDto {
   @IsString()
@@ -66,6 +66,11 @@ export class UpdateWorkspaceBoardDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workflowStatuses?: string[];
 }
 
 export class CreateWorkspaceTaskDto {
@@ -86,8 +91,9 @@ export class CreateWorkspaceTaskDto {
   clientId?: string;
 
   @IsOptional()
-  @IsEnum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED'])
-  status?: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED';
+  @IsString()
+  @MinLength(2)
+  status?: string;
 
   @IsOptional()
   @IsEnum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
@@ -109,8 +115,9 @@ export class UpdateWorkspaceTaskDto {
   description?: string;
 
   @IsOptional()
-  @IsEnum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED'])
-  status?: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED';
+  @IsString()
+  @MinLength(2)
+  status?: string;
 
   @IsOptional()
   @IsEnum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])

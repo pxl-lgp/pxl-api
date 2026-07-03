@@ -75,13 +75,6 @@ export const workspaceChannelTypeEnum = pgEnum('workspace_channel_type', [
 ]);
 export const workspaceVisibilityEnum = pgEnum('workspace_visibility', ['PUBLIC', 'PRIVATE']);
 export const workspaceMemberRoleEnum = pgEnum('workspace_member_role', ['OWNER', 'MEMBER']);
-export const workspaceTaskStatusEnum = pgEnum('workspace_task_status', [
-  'TODO',
-  'IN_PROGRESS',
-  'REVIEW',
-  'DONE',
-  'BLOCKED',
-]);
 export const workspaceTaskPriorityEnum = pgEnum('workspace_task_priority', [
   'LOW',
   'MEDIUM',
@@ -554,6 +547,7 @@ export const workspaceBoards = pgTable(
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     description: text('description'),
+    workflowStatuses: jsonb('workflow_statuses').$type<string[]>().default([]).notNull(),
     createdByUserId: uuid('created_by_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -581,7 +575,7 @@ export const workspaceTasks = pgTable(
     leadId: uuid('lead_id').references(() => leads.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description'),
-    status: workspaceTaskStatusEnum('status').default('TODO').notNull(),
+    status: text('status').default('TODO').notNull(),
     priority: workspaceTaskPriorityEnum('priority').default('MEDIUM').notNull(),
     assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
     reporterUserId: uuid('reporter_user_id').references(() => users.id, { onDelete: 'set null' }),

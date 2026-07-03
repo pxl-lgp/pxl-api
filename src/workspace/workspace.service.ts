@@ -262,9 +262,12 @@ export class WorkspaceService {
 
   async updateBoard(user: AuthenticatedUser, id: string, input: UpdateWorkspaceBoardDto) {
     await this.requireBoard(user, id);
+    const workflowStatuses = input.workflowStatuses
+      ?.map((status) => status.trim())
+      .filter((status, index, statuses) => status.length >= 2 && statuses.indexOf(status) === index);
     const [board] = await this.db
       .update(workspaceBoards)
-      .set({ ...input, name: input.name?.trim(), updatedAt: new Date() })
+      .set({ ...input, name: input.name?.trim(), workflowStatuses, updatedAt: new Date() })
       .where(and(eq(workspaceBoards.id, id), eq(workspaceBoards.organizationId, user.organizationId)))
       .returning();
     return board;
@@ -297,7 +300,7 @@ export class WorkspaceService {
         clientId: input.clientId,
         title: input.title.trim(),
         description: input.description,
-        status: input.status ?? 'TODO',
+        status: input.status?.trim() ?? 'TODO',
         priority: input.priority ?? 'MEDIUM',
         assigneeUserId: input.assigneeUserId,
         reporterUserId: user.id,
@@ -310,7 +313,7 @@ export class WorkspaceService {
     const existingTask = await this.requireTask(user, id);
     const [task] = await this.db
       .update(workspaceTasks)
-      .set({ ...input, title: input.title?.trim(), updatedAt: new Date() })
+      .set({ ...input, title: input.title?.trim(), status: input.status?.trim(), updatedAt: new Date() })
       .where(and(eq(workspaceTasks.id, id), eq(workspaceTasks.organizationId, user.organizationId)))
       .returning();
     if (input.status === 'DONE' && existingTask.status !== 'DONE') {

@@ -127,6 +127,20 @@
       "when": 1782151000000,
       "tag": "0017_client_user_links",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783180000000,
+      "tag": "0018_workspace_custom_statuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783181000000,
+      "tag": "0019_workspace_board_workflow_statuses",
+      "breakpoints": true
     }
   ]
 }
