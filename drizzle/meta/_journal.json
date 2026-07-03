@@ -141,6 +141,13 @@
       "when": 1783181000000,
       "tag": "0019_workspace_board_workflow_statuses",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783182000000,
+      "tag": "0020_landing_page_visits",
+      "breakpoints": true
     }
   ]
 }

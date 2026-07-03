@@ -31,6 +31,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { OnboardingTasksModule } from './onboarding-tasks/onboarding-tasks.module';
 import { OperationsModule } from './operations/operations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { PageVisitsModule } from './page-visits/page-visits.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -79,6 +80,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
     OnboardingTasksModule,
     OperationsModule,
     OrganizationsModule,
+    PageVisitsModule,
     PermissionsModule,
     ReportsModule,
     SchedulerModule,

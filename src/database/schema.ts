@@ -406,6 +406,18 @@ export const analytics = pgTable('analytics', {
   ...timestamps,
 });
 
+export const pageVisits = pgTable(
+  'page_visits',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    path: text('path').notNull(),
+    referrer: text('referrer'),
+    userAgent: text('user_agent'),
+    ...timestamps,
+  },
+  (table) => [index('page_visits_path_created_at_idx').on(table.path, table.createdAt)],
+);
+
 export const reports = pgTable('reports', {
   id: uuid('id').defaultRandom().primaryKey(),
   clientId: uuid('client_id')
