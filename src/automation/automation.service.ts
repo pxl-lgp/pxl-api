@@ -113,16 +113,31 @@ export class AutomationService {
     return null;
   }
 
-  async findAll(status?: AutomationStatus): Promise<AutomationLog[]> {
-    return this.db
+  async findAll(status?: AutomationStatus, organizationId?: string): Promise<AutomationLog[]> {
+    const logs = await this.db
       .select()
       .from(automationLogs)
       .where(status ? eq(automationLogs.status, status) : undefined)
       .orderBy(desc(automationLogs.createdAt));
+
+    if (!organizationId) {
+      return logs;
+    }
+
+    const scopedLogs = await Promise.all(
+      logs.map(async (log) => ({
+        log,
+        organizationId: await this.resolveOrganizationId(log.entityType, log.entityId),
+      })),
+    );
+
+    return scopedLogs
+      .filter((item) => item.organizationId === organizationId)
+      .map((item) => item.log);
   }
 
-  async getSummary() {
-    const logs = await this.findAll();
+  async getSummary(organizationId?: string) {
+    const logs = await this.findAll(undefined, organizationId);
     const failed = logs.filter((log) => log.status === 'FAILED');
     const pending = logs.filter((log) => log.status === 'PENDING');
     const succeeded = logs.filter((log) => log.status === 'SUCCEEDED');
@@ -140,7 +155,7 @@ export class AutomationService {
     };
   }
 
-  async findOne(id: string): Promise<AutomationLog> {
+  async findOne(id: string, organizationId?: string): Promise<AutomationLog> {
     const [log] = await this.db
       .select()
       .from(automationLogs)
@@ -149,6 +164,14 @@ export class AutomationService {
 
     if (!log) {
       throw new NotFoundException('Automation log not found.');
+    }
+
+    if (organizationId) {
+      const logOrganizationId = await this.resolveOrganizationId(log.entityType, log.entityId);
+
+      if (logOrganizationId !== organizationId) {
+        throw new NotFoundException('Automation log not found.');
+      }
     }
 
     return log;

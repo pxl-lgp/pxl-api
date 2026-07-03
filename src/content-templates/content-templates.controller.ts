@@ -22,8 +22,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { ContentTemplatesService } from './content-templates.service';
 import { ContentTemplateResponseDto } from './dto/content-template-response.dto';
 import { CreateContentTemplateDto } from './dto/create-content-template.dto';
@@ -48,8 +50,11 @@ export class ContentTemplatesController {
     description: 'Only admins and team members can manage content templates.',
   })
   @ApiNotFoundResponse({ description: 'Client not found.' })
-  create(@Body() input: CreateContentTemplateDto): Promise<ContentTemplateResponseDto> {
-    return this.contentTemplatesService.create(input);
+  create(
+    @Body() input: CreateContentTemplateDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentTemplateResponseDto> {
+    return this.contentTemplatesService.create(input, user.organizationId);
   }
 
   @Get()
@@ -64,8 +69,11 @@ export class ContentTemplatesController {
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view content templates.' })
-  findAvailable(@Query('clientId') clientId?: string): Promise<ContentTemplateResponseDto[]> {
-    return this.contentTemplatesService.findAvailable(clientId);
+  findAvailable(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('clientId') clientId?: string,
+  ): Promise<ContentTemplateResponseDto[]> {
+    return this.contentTemplatesService.findAvailable(user.organizationId, clientId);
   }
 
   @Patch(':id')
@@ -79,8 +87,9 @@ export class ContentTemplatesController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateContentTemplateDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ContentTemplateResponseDto> {
-    return this.contentTemplatesService.update(id, input);
+    return this.contentTemplatesService.update(id, input, user.organizationId);
   }
 
   @Delete(':id')
@@ -91,7 +100,10 @@ export class ContentTemplatesController {
     description: 'Only admins and team members can manage content templates.',
   })
   @ApiNotFoundResponse({ description: 'Content template not found.' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ deleted: true; id: string }> {
-    return this.contentTemplatesService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ deleted: true; id: string }> {
+    return this.contentTemplatesService.remove(id, user.organizationId);
   }
 }

@@ -35,7 +35,7 @@ export class ClientDriveController {
   @ApiOperation({ summary: 'List files in the current client Drive workspace' })
   async list(@CurrentUser() user: AuthenticatedUser, @Query('folderId') folderId?: string) {
     const client = await this.clientPortalService.getClientForUser(user);
-    return this.driveService.listClientFolder(client.id, folderId);
+    return this.driveService.listClientFolder(client.id, user.organizationId, folderId);
   }
 
   @Post('files')
@@ -55,7 +55,7 @@ export class ClientDriveController {
     @Query('parentFolderId') parentFolderId?: string,
   ) {
     const client = await this.clientPortalService.getClientForUser(user);
-    return this.driveService.uploadFile(client.id, file, parentFolderId);
+    return this.driveService.uploadFile(client.id, user.organizationId, file, parentFolderId);
   }
 
   @Get('files/:fileId/download')
@@ -66,7 +66,7 @@ export class ClientDriveController {
     @Res() response: Response,
   ) {
     const client = await this.clientPortalService.getClientForUser(user);
-    const file = await this.driveService.downloadFile(client.id, fileId);
+    const file = await this.driveService.downloadFile(client.id, user.organizationId, fileId);
     response.setHeader('Content-Type', file.mimeType);
     response.setHeader(
       'Content-Disposition',

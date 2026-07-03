@@ -73,7 +73,7 @@ export class SocialConnectionsService {
   ) {}
 
   async createMetaOauthUrl(clientId: string, user: AuthenticatedUser) {
-    await this.ensureClientExists(clientId);
+    await this.ensureClientExists(clientId, user.organizationId);
     const settings = this.getMetaSettings();
     const nonce = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -160,8 +160,8 @@ export class SocialConnectionsService {
     };
   }
 
-  async list(clientId: string) {
-    await this.ensureClientExists(clientId);
+  async list(clientId: string, organizationId: string) {
+    await this.ensureClientExists(clientId, organizationId);
 
     return this.db
       .select({
@@ -183,7 +183,9 @@ export class SocialConnectionsService {
       .orderBy(desc(socialConnections.updatedAt));
   }
 
-  async disconnect(clientId: string, connectionId: string) {
+  async disconnect(clientId: string, connectionId: string, organizationId: string) {
+    await this.ensureClientExists(clientId, organizationId);
+
     const [connection] = await this.db
       .update(socialConnections)
       .set({
@@ -213,7 +215,9 @@ export class SocialConnectionsService {
     };
   }
 
-  async syncAuthorization(clientId: string, authorizationId: string) {
+  async syncAuthorization(clientId: string, authorizationId: string, organizationId: string) {
+    await this.ensureClientExists(clientId, organizationId);
+
     const [authorization] = await this.db
       .select()
       .from(metaAuthorizations)
@@ -253,7 +257,7 @@ export class SocialConnectionsService {
       })
       .where(eq(metaAuthorizations.id, authorizationId));
 
-    return this.list(clientId);
+    return this.list(clientId, organizationId);
   }
 
   private async consumeOauthState(nonce: string) {
@@ -545,11 +549,11 @@ export class SocialConnectionsService {
     return createHash('sha256').update(value).digest('hex');
   }
 
-  private async ensureClientExists(clientId: string) {
+  private async ensureClientExists(clientId: string, organizationId: string) {
     const [client] = await this.db
       .select({ id: clients.id })
       .from(clients)
-      .where(eq(clients.id, clientId))
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
       .limit(1);
 
     if (!client) {

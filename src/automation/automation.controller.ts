@@ -9,8 +9,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AutomationService } from './automation.service';
 import { AutomationLogResponseDto } from './dto/automation-log-response.dto';
 
@@ -29,15 +31,16 @@ export class AutomationController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view automation logs.' })
   findAll(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: 'PENDING' | 'SENT' | 'SUCCEEDED' | 'FAILED',
   ): Promise<AutomationLogResponseDto[]> {
-    return this.automationService.findAll(status);
+    return this.automationService.findAll(status, user.organizationId);
   }
 
   @Get('summary')
   @ApiOperation({ summary: 'Get automation health summary' })
   @ApiOkResponse({ description: 'Automation summary.' })
-  getSummary() {
-    return this.automationService.getSummary();
+  getSummary(@CurrentUser() user: AuthenticatedUser) {
+    return this.automationService.getSummary(user.organizationId);
   }
 }

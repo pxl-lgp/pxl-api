@@ -22,8 +22,8 @@ export class AutomationRetryService {
    * review follow-up — n8n previously gave retries for free). Only the
    * background, idempotent automations are retryable.
    */
-  async retry(logId: string): Promise<RetryResult> {
-    const log = await this.automationService.findOne(logId);
+  async retry(logId: string, organizationId?: string): Promise<RetryResult> {
+    const log = await this.automationService.findOne(logId, organizationId);
 
     if (log.status !== 'FAILED') {
       throw new BadRequestException('Only failed automations can be retried.');

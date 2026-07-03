@@ -45,8 +45,11 @@ export class ApprovalsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can create approvals.' })
   @ApiNotFoundResponse({ description: 'Content item not found.' })
-  create(@Body() input: CreateApprovalDto): Promise<ApprovalResponseDto> {
-    return this.approvalsService.create(input);
+  create(
+    @Body() input: CreateApprovalDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApprovalResponseDto> {
+    return this.approvalsService.create(input, user.organizationId);
   }
 
   @Get()
@@ -54,8 +57,8 @@ export class ApprovalsController {
   @ApiOkResponse({ description: 'Approval list.', type: ApprovalResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can list approvals.' })
-  findAll(): Promise<ApprovalResponseDto[]> {
-    return this.approvalsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser): Promise<ApprovalResponseDto[]> {
+    return this.approvalsService.findAll(user.organizationId);
   }
 
   @Get(':id')
@@ -64,8 +67,11 @@ export class ApprovalsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can view approvals.' })
   @ApiNotFoundResponse({ description: 'Approval not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ApprovalResponseDto> {
-    return this.approvalsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApprovalResponseDto> {
+    return this.approvalsService.findOne(id, user.organizationId);
   }
 
   @Get(':id/comments')
@@ -75,8 +81,11 @@ export class ApprovalsController {
     type: ApprovalCommentResponseDto,
     isArray: true,
   })
-  findComments(@Param('id', ParseUUIDPipe) id: string): Promise<ApprovalCommentResponseDto[]> {
-    return this.approvalsService.findComments(id);
+  findComments(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApprovalCommentResponseDto[]> {
+    return this.approvalsService.findComments(id, user.organizationId);
   }
 
   @Post(':id/comments')
@@ -103,7 +112,8 @@ export class ApprovalsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateApprovalDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ApprovalResponseDto> {
-    return this.approvalsService.update(id, input);
+    return this.approvalsService.update(id, input, user.organizationId);
   }
 }

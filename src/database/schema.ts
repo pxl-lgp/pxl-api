@@ -410,12 +410,22 @@ export const pageVisits = pgTable(
   'page_visits',
   {
     id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .references(() => organizations.id, { onDelete: 'cascade' })
+      .default(DEFAULT_ORGANIZATION_ID)
+      .notNull(),
     path: text('path').notNull(),
     referrer: text('referrer'),
     userAgent: text('user_agent'),
     ...timestamps,
   },
-  (table) => [index('page_visits_path_created_at_idx').on(table.path, table.createdAt)],
+  (table) => [
+    index('page_visits_organization_path_created_at_idx').on(
+      table.organizationId,
+      table.path,
+      table.createdAt,
+    ),
+  ],
 );
 
 export const reports = pgTable('reports', {

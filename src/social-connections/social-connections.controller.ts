@@ -20,8 +20,11 @@ export class SocialConnectionsController {
   @Get()
   @ApiOperation({ summary: 'List every social Page connected to a client' })
   @ApiOkResponse({ type: SocialConnectionResponseDto, isArray: true })
-  list(@Param('clientId', ParseUUIDPipe) clientId: string) {
-    return this.socialConnectionsService.list(clientId);
+  list(
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.socialConnectionsService.list(clientId, user.organizationId);
   }
 
   @Post('meta/oauth-url')
@@ -40,8 +43,9 @@ export class SocialConnectionsController {
   syncAuthorization(
     @Param('clientId', ParseUUIDPipe) clientId: string,
     @Param('authorizationId', ParseUUIDPipe) authorizationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.socialConnectionsService.syncAuthorization(clientId, authorizationId);
+    return this.socialConnectionsService.syncAuthorization(clientId, authorizationId, user.organizationId);
   }
 
   @Delete(':connectionId')
@@ -50,7 +54,8 @@ export class SocialConnectionsController {
   disconnect(
     @Param('clientId', ParseUUIDPipe) clientId: string,
     @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.socialConnectionsService.disconnect(clientId, connectionId);
+    return this.socialConnectionsService.disconnect(clientId, connectionId, user.organizationId);
   }
 }

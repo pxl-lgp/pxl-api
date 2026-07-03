@@ -20,8 +20,8 @@ export class ApprovalsService {
     private readonly workspaceService: WorkspaceService,
   ) {}
 
-  async create(input: CreateApprovalDto): Promise<ApprovalRecord> {
-    const contentItem = await this.ensureContentItemExists(input.contentItemId);
+  async create(input: CreateApprovalDto, organizationId: string): Promise<ApprovalRecord> {
+    const contentItem = await this.ensureContentItemExists(input.contentItemId, organizationId);
 
     try {
       return await this.db.transaction(async (tx) => {
@@ -58,12 +58,29 @@ export class ApprovalsService {
     }
   }
 
-  async findAll(): Promise<ApprovalRecord[]> {
-    return this.db.select().from(approvals).orderBy(desc(approvals.createdAt));
+  async findAll(organizationId: string): Promise<ApprovalRecord[]> {
+    const rows = await this.db
+      .select({ approval: approvals })
+      .from(approvals)
+      .innerJoin(clients, eq(approvals.clientId, clients.id))
+      .where(eq(clients.organizationId, organizationId))
+      .orderBy(desc(approvals.createdAt));
+
+    return rows.map((row) => row.approval);
   }
 
-  async findOne(id: string): Promise<ApprovalRecord> {
-    const [approval] = await this.db.select().from(approvals).where(eq(approvals.id, id)).limit(1);
+  async findOne(id: string, organizationId?: string): Promise<ApprovalRecord> {
+    const [row] = await this.db
+      .select({ approval: approvals })
+      .from(approvals)
+      .innerJoin(clients, eq(approvals.clientId, clients.id))
+      .where(
+        organizationId
+          ? and(eq(approvals.id, id), eq(clients.organizationId, organizationId))
+          : eq(approvals.id, id),
+      )
+      .limit(1);
+    const approval = row?.approval;
 
     if (!approval) {
       throw new NotFoundException('Approval not found.');
@@ -72,8 +89,12 @@ export class ApprovalsService {
     return approval;
   }
 
-  async update(id: string, input: UpdateApprovalDto): Promise<ApprovalRecord> {
-    const existingApproval = await this.findOne(id);
+  async update(
+    id: string,
+    input: UpdateApprovalDto,
+    organizationId: string,
+  ): Promise<ApprovalRecord> {
+    const existingApproval = await this.findOne(id, organizationId);
 
     if (input.status === 'PENDING') {
       throw new BadRequestException('Approval decisions must be APPROVED or REVISION_REQUESTED.');
@@ -131,8 +152,11 @@ export class ApprovalsService {
     return updatedApproval;
   }
 
-  async findComments(approvalId: string): Promise<ApprovalCommentRecord[]> {
-    await this.findOne(approvalId);
+  async findComments(
+    approvalId: string,
+    organizationId: string,
+  ): Promise<ApprovalCommentRecord[]> {
+    await this.findOne(approvalId, organizationId);
 
     return this.db
       .select()
@@ -146,7 +170,7 @@ export class ApprovalsService {
     user: AuthenticatedUser,
     input: CreateApprovalCommentDto,
   ): Promise<ApprovalCommentRecord> {
-    const approval = await this.findOne(approvalId);
+    const approval = await this.findOne(approvalId, user.organizationId);
     const [comment] = await this.db
       .insert(approvalComments)
       .values({
@@ -213,17 +237,18 @@ export class ApprovalsService {
     return approval;
   }
 
-  private async ensureContentItemExists(contentItemId: string) {
+  private async ensureContentItemExists(contentItemId: string, organizationId: string) {
     const [contentItem] = await this.db
-      .select()
+      .select({ contentItem: contentItems })
       .from(contentItems)
-      .where(eq(contentItems.id, contentItemId))
+      .innerJoin(clients, eq(contentItems.clientId, clients.id))
+      .where(and(eq(contentItems.id, contentItemId), eq(clients.organizationId, organizationId)))
       .limit(1);
 
     if (!contentItem) {
       throw new NotFoundException('Content item not found.');
     }
 
-    return contentItem;
+    return contentItem.contentItem;
   }
 }

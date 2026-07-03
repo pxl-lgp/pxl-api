@@ -122,8 +122,8 @@ export class DriveService {
     return webViewLink;
   }
 
-  async listClientFolder(clientId: string, folderId?: string) {
-    const rootFolderId = await this.getClientRootFolderId(clientId);
+  async listClientFolder(clientId: string, organizationId: string, folderId?: string) {
+    const rootFolderId = await this.getClientRootFolderId(clientId, organizationId);
     const currentFolderId = folderId || rootFolderId;
     await this.assertFolderWithinRoot(rootFolderId, currentFolderId);
 
@@ -158,8 +158,13 @@ export class DriveService {
     };
   }
 
-  async createFolder(clientId: string, name: string, parentFolderId?: string) {
-    const rootFolderId = await this.getClientRootFolderId(clientId);
+  async createFolder(
+    clientId: string,
+    organizationId: string,
+    name: string,
+    parentFolderId?: string,
+  ) {
+    const rootFolderId = await this.getClientRootFolderId(clientId, organizationId);
     const parentId = parentFolderId || rootFolderId;
     await this.assertFolderWithinRoot(rootFolderId, parentId);
 
@@ -176,12 +181,17 @@ export class DriveService {
     return this.mapItem(response.data);
   }
 
-  async uploadFile(clientId: string, file: Express.Multer.File, parentFolderId?: string) {
+  async uploadFile(
+    clientId: string,
+    organizationId: string,
+    file: Express.Multer.File,
+    parentFolderId?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('A file is required.');
     }
 
-    const rootFolderId = await this.getClientRootFolderId(clientId);
+    const rootFolderId = await this.getClientRootFolderId(clientId, organizationId);
     const parentId = parentFolderId || rootFolderId;
     await this.assertFolderWithinRoot(rootFolderId, parentId);
 
@@ -201,8 +211,8 @@ export class DriveService {
     return this.mapItem(response.data);
   }
 
-  async downloadFile(clientId: string, fileId: string) {
-    const rootFolderId = await this.getClientRootFolderId(clientId);
+  async downloadFile(clientId: string, organizationId: string, fileId: string) {
+    const rootFolderId = await this.getClientRootFolderId(clientId, organizationId);
     const file = await this.getFileMetadata(fileId);
     await this.assertItemWithinRoot(rootFolderId, file);
 
@@ -230,8 +240,8 @@ export class DriveService {
     };
   }
 
-  async deleteItem(clientId: string, fileId: string) {
-    const rootFolderId = await this.getClientRootFolderId(clientId);
+  async deleteItem(clientId: string, organizationId: string, fileId: string) {
+    const rootFolderId = await this.getClientRootFolderId(clientId, organizationId);
 
     if (fileId === rootFolderId) {
       throw new ForbiddenException('The client root folder cannot be deleted.');
@@ -254,8 +264,8 @@ export class DriveService {
     return this.drive;
   }
 
-  private async getClientRootFolderId(clientId: string) {
-    const client = await this.clientsService.findOne(clientId);
+  private async getClientRootFolderId(clientId: string, organizationId: string) {
+    const client = await this.clientsService.findOne(clientId, organizationId);
 
     if (!client.driveFolderUrl) {
       throw new BadRequestException('This client does not have a Google Drive folder yet.');

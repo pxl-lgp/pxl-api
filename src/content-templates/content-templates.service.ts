@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, isNull, or } from 'drizzle-orm';
 import { OperationError } from '../common/errors/operation-error';
 import { DRIZZLE } from '../database/database.constants';
 import { Database } from '../database/database.types';
@@ -13,9 +13,9 @@ type ContentTemplateRecord = typeof contentTemplates.$inferSelect;
 export class ContentTemplatesService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  async create(input: CreateContentTemplateDto): Promise<ContentTemplateRecord> {
+  async create(input: CreateContentTemplateDto, organizationId: string): Promise<ContentTemplateRecord> {
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     try {
@@ -45,12 +45,14 @@ export class ContentTemplatesService {
   }
 
   /**
-   * Lists templates available to a client: shared (clientId NULL) plus that
-   * client's own. With no clientId, returns every template.
+   * Lists shared templates plus templates that belong to clients in the caller's organization.
    */
-  async findAvailable(clientId?: string): Promise<ContentTemplateRecord[]> {
+  async findAvailable(
+    organizationId: string,
+    clientId?: string,
+  ): Promise<ContentTemplateRecord[]> {
     if (clientId) {
-      await this.ensureClientExists(clientId);
+      await this.ensureClientExists(clientId, organizationId);
 
       return this.db
         .select()
@@ -59,15 +61,29 @@ export class ContentTemplatesService {
         .orderBy(asc(contentTemplates.name));
     }
 
-    return this.db.select().from(contentTemplates).orderBy(asc(contentTemplates.name));
+    const rows = await this.db
+      .select({ template: contentTemplates })
+      .from(contentTemplates)
+      .leftJoin(clients, eq(contentTemplates.clientId, clients.id))
+      .where(or(isNull(contentTemplates.clientId), eq(clients.organizationId, organizationId)))
+      .orderBy(asc(contentTemplates.name));
+
+    return rows.map((row) => row.template);
   }
 
-  async findOne(id: string): Promise<ContentTemplateRecord> {
-    const [template] = await this.db
-      .select()
+  async findOne(id: string, organizationId: string): Promise<ContentTemplateRecord> {
+    const [row] = await this.db
+      .select({ template: contentTemplates })
       .from(contentTemplates)
-      .where(eq(contentTemplates.id, id))
+      .leftJoin(clients, eq(contentTemplates.clientId, clients.id))
+      .where(
+        and(
+          eq(contentTemplates.id, id),
+          or(isNull(contentTemplates.clientId), eq(clients.organizationId, organizationId)),
+        ),
+      )
       .limit(1);
+    const template = row?.template;
 
     if (!template) {
       throw new NotFoundException('Content template not found.');
@@ -76,11 +92,15 @@ export class ContentTemplatesService {
     return template;
   }
 
-  async update(id: string, input: UpdateContentTemplateDto): Promise<ContentTemplateRecord> {
-    await this.findOne(id);
+  async update(
+    id: string,
+    input: UpdateContentTemplateDto,
+    organizationId: string,
+  ): Promise<ContentTemplateRecord> {
+    await this.findOne(id, organizationId);
 
     if (input.clientId) {
-      await this.ensureClientExists(input.clientId);
+      await this.ensureClientExists(input.clientId, organizationId);
     }
 
     const [template] = await this.db
@@ -92,18 +112,18 @@ export class ContentTemplatesService {
     return template;
   }
 
-  async remove(id: string): Promise<{ deleted: true; id: string }> {
-    await this.findOne(id);
+  async remove(id: string, organizationId: string): Promise<{ deleted: true; id: string }> {
+    await this.findOne(id, organizationId);
     await this.db.delete(contentTemplates).where(eq(contentTemplates.id, id));
 
     return { deleted: true, id };
   }
 
-  private async ensureClientExists(clientId: string): Promise<void> {
+  private async ensureClientExists(clientId: string, organizationId: string): Promise<void> {
     const [client] = await this.db
       .select({ id: clients.id })
       .from(clients)
-      .where(eq(clients.id, clientId))
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, organizationId)))
       .limit(1);
 
     if (!client) {

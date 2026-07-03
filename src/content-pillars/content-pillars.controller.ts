@@ -22,8 +22,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { ContentPillarsService } from './content-pillars.service';
 import { ContentPillarResponseDto } from './dto/content-pillar-response.dto';
 import { CreateContentPillarDto } from './dto/create-content-pillar.dto';
@@ -43,8 +45,11 @@ export class ContentPillarsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can manage content pillars.' })
   @ApiNotFoundResponse({ description: 'Client not found.' })
-  create(@Body() input: CreateContentPillarDto): Promise<ContentPillarResponseDto> {
-    return this.contentPillarsService.create(input);
+  create(
+    @Body() input: CreateContentPillarDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ContentPillarResponseDto> {
+    return this.contentPillarsService.create(input, user.organizationId);
   }
 
   @Get()
@@ -56,8 +61,9 @@ export class ContentPillarsController {
   @ApiNotFoundResponse({ description: 'Client not found.' })
   findForClient(
     @Query('clientId', ParseUUIDPipe) clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ContentPillarResponseDto[]> {
-    return this.contentPillarsService.findForClient(clientId);
+    return this.contentPillarsService.findForClient(clientId, user.organizationId);
   }
 
   @Patch(':id')
@@ -69,8 +75,9 @@ export class ContentPillarsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() input: UpdateContentPillarDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ContentPillarResponseDto> {
-    return this.contentPillarsService.update(id, input);
+    return this.contentPillarsService.update(id, input, user.organizationId);
   }
 
   @Delete(':id')
@@ -79,7 +86,10 @@ export class ContentPillarsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   @ApiForbiddenResponse({ description: 'Only admins and team members can manage content pillars.' })
   @ApiNotFoundResponse({ description: 'Content pillar not found.' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ deleted: true; id: string }> {
-    return this.contentPillarsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ deleted: true; id: string }> {
+    return this.contentPillarsService.remove(id, user.organizationId);
   }
 }

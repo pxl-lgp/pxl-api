@@ -10,8 +10,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { AutomationRetryService, RetryResult } from './automation-retry.service';
 
 @ApiTags('automation')
@@ -29,7 +31,10 @@ export class AutomationRetryController {
   @ApiForbiddenResponse({ description: 'Only admins and team members can retry automations.' })
   @ApiNotFoundResponse({ description: 'Automation log not found.' })
   @ApiBadRequestResponse({ description: 'Log is not failed or is not retryable.' })
-  retry(@Param('id', ParseUUIDPipe) id: string): Promise<RetryResult> {
-    return this.automationRetryService.retry(id);
+  retry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<RetryResult> {
+    return this.automationRetryService.retry(id, user.organizationId);
   }
 }
