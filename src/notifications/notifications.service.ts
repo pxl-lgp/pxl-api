@@ -27,10 +27,16 @@ export class NotificationsService {
       return;
     }
 
+    const port = config.get('SMTP_PORT', { infer: true });
+
     this.transporter = nodemailer.createTransport({
       host,
-      port: config.get('SMTP_PORT', { infer: true }),
+      port,
+      secure: port === 465,
       auth: user && pass ? { user, pass } : undefined,
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 30_000,
     });
   }
 
