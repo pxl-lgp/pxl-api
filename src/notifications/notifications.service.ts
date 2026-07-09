@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { setDefaultResultOrder } from 'node:dns';
 import * as nodemailer from 'nodemailer';
 import { AppConfig } from '../config/app.config';
 import { SettingsService } from '../settings/settings.service';
@@ -28,6 +29,8 @@ export class NotificationsService {
     }
 
     const port = config.get('SMTP_PORT', { infer: true });
+
+    setDefaultResultOrder('ipv4first');
 
     this.transporter = nodemailer.createTransport({
       host,
