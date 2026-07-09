@@ -1,14 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { google, gmail_v1 } from 'googleapis';
 import { setDefaultResultOrder } from 'node:dns';
 import * as nodemailer from 'nodemailer';
 import { AppConfig } from '../config/app.config';
 import { SettingsService } from '../settings/settings.service';
 
+type EmailMessage = {
+  from: string;
+  to: string | string[];
+  subject: string;
+  text: string;
+  html?: string;
+};
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly transporter: nodemailer.Transporter | null;
+  private readonly gmail: gmail_v1.Gmail | null;
   private readonly from: string;
   private readonly teamEmail: string | undefined;
 
@@ -19,9 +29,21 @@ export class NotificationsService {
     const host = config.get('SMTP_HOST', { infer: true });
     const user = config.get('SMTP_USER', { infer: true });
     const pass = config.get('SMTP_PASS', { infer: true });
+    const gmailClientId = config.get('GMAIL_CLIENT_ID', { infer: true });
+    const gmailClientSecret = config.get('GMAIL_CLIENT_SECRET', { infer: true });
+    const gmailRefreshToken = config.get('GMAIL_REFRESH_TOKEN', { infer: true });
+    const gmailSenderEmail = config.get('GMAIL_SENDER_EMAIL', { infer: true });
 
-    this.from = config.get('SMTP_FROM', { infer: true }) ?? `PXL <${user ?? 'noreply@pxl.local'}>`;
+    this.from = config.get('SMTP_FROM', { infer: true }) ?? `PXL <${gmailSenderEmail ?? user ?? 'noreply@pxl.local'}>`;
     this.teamEmail = config.get('TEAM_NOTIFICATION_EMAIL', { infer: true });
+
+    if (gmailClientId && gmailClientSecret && gmailRefreshToken) {
+      const oauth2Client = new google.auth.OAuth2(gmailClientId, gmailClientSecret);
+      oauth2Client.setCredentials({ refresh_token: gmailRefreshToken });
+      this.gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    } else {
+      this.gmail = null;
+    }
 
     if (!host) {
       this.transporter = null;
@@ -50,12 +72,12 @@ export class NotificationsService {
   async notifyTeam(subject: string, body: string): Promise<void> {
     const recipients = await this.settingsService.getRecipients('new-lead', this.teamEmail);
 
-    if (!this.transporter || recipients.length === 0) {
+    if (!this.canSendEmail() || recipients.length === 0) {
       return;
     }
 
     try {
-      await this.transporter.sendMail({
+      await this.sendEmail({
         from: this.from,
         to: recipients,
         subject,
@@ -80,7 +102,7 @@ export class NotificationsService {
       new Set([...configuredRecipients, ...(this.teamEmail ? [this.teamEmail] : [])]),
     );
 
-    if (!this.transporter || recipients.length === 0) {
+    if (!this.canSendEmail() || recipients.length === 0) {
       return;
     }
 
@@ -94,7 +116,7 @@ export class NotificationsService {
     ].filter(Boolean);
 
     try {
-      await this.transporter.sendMail({
+      await this.sendEmail({
         from: this.from,
         to: recipients,
         subject: `New lead: ${lead.businessName}`,
@@ -112,7 +134,7 @@ export class NotificationsService {
     contactPerson?: string | null;
     email?: string | null;
   }): Promise<void> {
-    if (!this.transporter || !this.teamEmail) {
+    if (!this.canSendEmail() || !this.teamEmail) {
       return;
     }
 
@@ -123,7 +145,7 @@ export class NotificationsService {
     ].filter(Boolean);
 
     try {
-      await this.transporter.sendMail({
+      await this.sendEmail({
         from: this.from,
         to: this.teamEmail,
         subject: `New onboarding: ${client.businessName}`,
@@ -136,12 +158,12 @@ export class NotificationsService {
   }
 
   async notifyUser(to: string, subject: string, body: string): Promise<void> {
-    if (!this.transporter) {
+    if (!this.canSendEmail()) {
       return;
     }
 
     try {
-      await this.transporter.sendMail({
+      await this.sendEmail({
         from: this.from,
         to,
         subject,
@@ -151,6 +173,76 @@ export class NotificationsService {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to send user notification "${subject}": ${message}`);
     }
+  }
+
+  private canSendEmail(): boolean {
+    return Boolean(this.gmail || this.transporter);
+  }
+
+  private async sendEmail(message: EmailMessage): Promise<void> {
+    if (this.gmail) {
+      await this.gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: this.buildGmailRawMessage(message),
+        },
+      });
+      return;
+    }
+
+    if (this.transporter) {
+      await this.transporter.sendMail(message);
+    }
+  }
+
+  private buildGmailRawMessage(message: EmailMessage): string {
+    const to = Array.isArray(message.to) ? message.to.join(', ') : message.to;
+    const boundary = `pxl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+    const headers = [
+      `From: ${message.from}`,
+      `To: ${to}`,
+      `Subject: ${this.encodeMimeHeader(message.subject)}`,
+      'MIME-Version: 1.0',
+    ];
+
+    const raw = message.html
+      ? [
+          ...headers,
+          `Content-Type: multipart/alternative; boundary="${boundary}"`,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 7bit',
+          '',
+          message.text,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/html; charset="UTF-8"',
+          'Content-Transfer-Encoding: 7bit',
+          '',
+          message.html,
+          '',
+          `--${boundary}--`,
+        ].join('\r\n')
+      : [
+          ...headers,
+          'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 7bit',
+          '',
+          message.text,
+        ].join('\r\n');
+
+    return Buffer.from(raw)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
+  private encodeMimeHeader(value: string): string {
+    return /^[\x00-\x7F]*$/.test(value)
+      ? value
+      : `=?UTF-8?B?${Buffer.from(value).toString('base64')}?=`;
   }
 
   private buildLeadNotificationHtml(lead: {
