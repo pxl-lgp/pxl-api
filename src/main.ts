@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -16,12 +17,13 @@ function parseAllowedOrigins(originConfig: string) {
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService<AppConfig, true>);
   const port = config.get('PORT', { infer: true });
   const allowedOrigins = parseAllowedOrigins(config.get('CORS_ORIGIN', { infer: true }));
 
   app.setGlobalPrefix('api');
+  app.set('trust proxy', 1);
   app.use(helmet());
   // Flush in-flight requests and close the DB pool cleanly on SIGTERM/SIGINT.
   app.enableShutdownHooks();
